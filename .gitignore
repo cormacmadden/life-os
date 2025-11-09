@@ -1,0 +1,67 @@
+# Environment variables
+.env
+backend/.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv
+*.egg-info/
+
+# Node
+node_modules/
+.next/
+npm-debug.log*
+
+# Database
+*.db
+*.db-*
+lifeos_data.db
+postgres_data/
+
+# Tokens & Credentials
+backend/token.json
+backend/spotify_tokens.json
+backend/credentials.json
+backend/.garmin_tokens/
+monzo_tokens.json
+*_tokens.json
+
+# SSL Certificates
+backend/cert.pem
+backend/key.pem
+*.pem
+*.key
+*.crt
+
+# Cloudflare
+cloudflared.exe
+cloudflared
+
+# Logs
+*.log
+*.log.*
+ha_config/home-assistant.log*
+ha_config/.ha_run.lock
+ha_config/home-assistant_v2.db*
+
+# Home Assistant
+ha_config/.storage/
+ha_config/deps/
+ha_config/tts/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
