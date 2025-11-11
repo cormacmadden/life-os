@@ -84,8 +84,8 @@ export const CalendarWidget: React.FC<CalendarWidgetProps> = ({
                 {/* Office indicator */}
                 {isOffice && (
                   <div className={`flex items-center justify-center space-x-1 mb-2 p-1.5 rounded ${THEME.mainBg}`}>
-                    <Briefcase size={10} className={THEME.main} />
-                    <span className={`text-xs ${THEME.main} font-medium`}>in office</span>
+                    <Briefcase size={10} style={{ color: '#1e2124' }} />
+                    <span className={`text-xs font-medium`} style={{ color: '#1e2124' }}>in office</span>
                   </div>
                 )}
 

@@ -63,7 +63,7 @@ export const BusWidget: React.FC<BusWidgetProps> = ({
                 onClick={() => setActiveBusTab('workbound')}
                 className={`px-3 py-1 rounded transition-colors ${
                   activeBusTab === 'workbound'
-                    ? `${THEME.mainBg} ${THEME.bg}`
+                    ? `${THEME.mainBg} ${THEME.bgDarker}`
                     : `${THEME.sub} hover:${THEME.text}`
                 }`}
               >
@@ -73,7 +73,7 @@ export const BusWidget: React.FC<BusWidgetProps> = ({
                 onClick={() => setActiveBusTab('homebound')}
                 className={`px-3 py-1 rounded transition-colors ${
                   activeBusTab === 'homebound'
-                    ? `${THEME.mainBg} ${THEME.bg}`
+                    ? `${THEME.mainBg} ${THEME.bgDarker}`
                     : `${THEME.sub} hover:${THEME.text}`
                 }`}
               >

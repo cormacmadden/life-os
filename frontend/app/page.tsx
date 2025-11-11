@@ -154,28 +154,28 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
-  // Widget visibility settings - load from localStorage
-  const [widgetVisibility, setWidgetVisibility] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('widgetVisibility');
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    }
-    return {
-      bus: true,
-      busMap: true,
-      spotify: true,
-      garmin: true,
-      calendar: true,
-      smarthome: true,
-      plants: true,
-      car: true,
-      finance: true,
-      email: true,
-      weather: true,
-    };
+  // Widget visibility settings - always initialize with defaults to avoid hydration mismatch
+  const [widgetVisibility, setWidgetVisibility] = useState({
+    bus: true,
+    busMap: true,
+    spotify: true,
+    garmin: true,
+    calendar: true,
+    smarthome: true,
+    plants: true,
+    car: true,
+    finance: true,
+    email: true,
+    weather: true,
   });
+
+  // Load from localStorage after mount (client-side only)
+  useEffect(() => {
+    const saved = localStorage.getItem('widgetVisibility');
+    if (saved) {
+      setWidgetVisibility(JSON.parse(saved));
+    }
+  }, []);
 
   // Save widget visibility to localStorage whenever it changes
   useEffect(() => {
@@ -278,28 +278,24 @@ export default function App() {
   }, [API_BASE_URL, isClient]);
 
   const fetchBusData = (forceRefresh = false) => {
-     // UNCOMMENT LOCALLY:
-     
-     if (!isClient) return;
-     setIsBusLoading(true);
-     fetch(`${API_BASE_URL}/api/bus${forceRefresh ? '?force=true' : ''}`)
-       .then(res => res.json())
-       .then(data => { 
-         setBusData(data); 
-         setIsBusLoading(false); 
-         setLastBusRefresh(new Date());
-         // Also refresh the bus map
-         if (busMapRef.current) {
-           busMapRef.current.refresh();
-         }
-       })
-       .catch(e => { 
-         console.error(e); 
-         setIsBusLoading(false); 
-       });
-     
-     if (!isClient) return;
-     setIsBusLoading(true); setTimeout(() => setIsBusLoading(false), 800);
+    if (!isClient) return;
+    setIsBusLoading(true);
+    
+    fetch(`${API_BASE_URL}/api/bus${forceRefresh ? '?force=true' : ''}`)
+      .then(res => res.json())
+      .then(data => { 
+        setBusData(data); 
+        setIsBusLoading(false); 
+        setLastBusRefresh(new Date());
+        // Also refresh the bus map
+        if (busMapRef.current) {
+          busMapRef.current.refresh();
+        }
+      })
+      .catch(e => { 
+        console.error(e); 
+        setIsBusLoading(false); 
+      });
   };
 
   const fetchGoogleData = () => {

@@ -148,6 +148,10 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
 
       if (stopsRes.ok) {
         const stopsData = await stopsRes.json();
+        if (stopsData.stops.length === 0) {
+          
+          // Handle case when no stops are returned
+        }
         setStops(stopsData.stops || []);
       }
 
@@ -343,7 +347,7 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
       };
       
       initializeMap();
-      // Note: fetchData() is not called here - real bus locations only load on manual refresh
+      // Note: fetchData() is NOT called here - real bus locations only load on manual refresh
     }
   }, [apiUrl]);
 
@@ -365,11 +369,13 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
     );
 
     // Initialize map and fit to bounds with padding
-    const map = L.map(mapRef.current).fitBounds(bounds, { padding: [30, 30] });
+    const map = L.map(mapRef.current, {
+      attributionControl: false,  // Remove attribution
+      zoomControl: false  // Remove zoom controls (+/- buttons)
+    }).fitBounds(bounds, { padding: [30, 30] });
 
     // Add OpenStreetMap tiles with dark theme
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '© OpenStreetMap contributors © CARTO',
       maxZoom: 19
     }).addTo(map);
 
@@ -381,7 +387,7 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
         mapInstanceRef.current = null;
       }
     };
-  }, [mapLoaded, stops]);
+  }, [mapLoaded]);
 
   // Update markers when data changes
   useEffect(() => {
@@ -551,10 +557,6 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
       {!mapLoaded ? (
         <div className={`h-[calc(100%-40px)] flex items-center justify-center ${THEME.bgDarker} rounded`}>
           <p className={`${THEME.sub} text-sm`}>Loading map...</p>
-        </div>
-      ) : stops.length === 0 ? (
-        <div className={`h-[calc(100%-40px)] flex items-center justify-center ${THEME.bgDarker} rounded`}>
-          <p className={`${THEME.sub} text-sm`}>No bus stops data available</p>
         </div>
       ) : (
         <div ref={mapRef} className="h-[calc(100%-40px)] rounded overflow-hidden" style={{ zIndex: 1 }} />

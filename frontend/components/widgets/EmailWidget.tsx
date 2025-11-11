@@ -19,7 +19,7 @@ export const EmailWidget: React.FC<EmailWidgetProps> = ({ emails, isAuthenticate
           !isAuthenticated ? (
             <span className={`text-xs ${THEME.sub}`}>[mock data]</span>
           ) : (
-            <span className={`${THEME.mainBg} ${THEME.bgDarker} text-xs px-2 py-1 rounded`}>
+            <span className={`${THEME.mainBg} text-xs px-2 py-1 rounded`} style={{ color: '#2c2e31' }}>
               {emails.length} recent
             </span>
           )
