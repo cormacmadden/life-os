@@ -1,8 +1,9 @@
 # LifeOS - Personal Dashboard
 
-A cyberpunk-themed personal dashboard that integrates with various services including Spotify, Garmin Connect, Google Calendar, Home Assistant, and more.
+A personal dashboard that integrates with various services including Spotify, Garmin Connect, Google Calendar, Home Assistant, and more.
 
-> **📋 [View the Development Roadmap](./ROADMAP.md)** - See what's planned and contribute ideas!
+
+![alt text](/docs/Screenshot%202025-11-11%20182735.png?raw=true)
 
 ## Features
 
@@ -16,6 +17,8 @@ A cyberpunk-themed personal dashboard that integrates with various services incl
 - 📧 **Email** - Gmail inbox preview
 - 🌤️ **Weather** - Multi-city weather display
 - 🚗 **Car Management** - MOT, tax, and mileage tracking
+
+> **📋 [View the Development Roadmap](./ROADMAP.md)** - See what's planned and contribute ideas!
 
 ## Prerequisites
 
