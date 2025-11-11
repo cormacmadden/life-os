@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { Home, Lightbulb, Lock, Unlock, Power, Wind, Thermometer, AlertCircle } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../Card';
 import { THEME } from '@/lib/theme';
-import { useApiUrl } from '@/lib/useApiUrl';
 
 interface Device {
   entity_id: string;
@@ -12,35 +11,42 @@ interface Device {
 }
 
 interface SmartHomeWidgetProps {
+  apiUrl: string;
   homeState?: any; // Keep for backward compatibility but won't use
   handleSmartHomeToggle?: any; // Keep for backward compatibility but won't use
 }
 
-export const SmartHomeWidget: React.FC<SmartHomeWidgetProps> = () => {
+export const SmartHomeWidget: React.FC<SmartHomeWidgetProps> = ({ apiUrl }) => {
   const [devices, setDevices] = useState<Device[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { apiUrl: API_BASE_URL, isDetecting } = useApiUrl();
 
   useEffect(() => {
-    if (!isDetecting && API_BASE_URL) {
+    if (apiUrl) {
       fetchDevices();
     }
-  }, [isDetecting, API_BASE_URL]);
+  }, [apiUrl]);
 
   const fetchDevices = async () => {
     try {
-      console.log('Fetching devices from:', `${API_BASE_URL}/api/smarthome/devices`);
-      const response = await fetch(`${API_BASE_URL}/api/smarthome/devices`);
-      console.log('Device fetch response:', response.status, response.ok);
-      if (!response.ok) throw new Error('Failed to fetch devices');
+      const response = await fetch(`${apiUrl}/api/smarthome/devices`);
+      
+      if (!response.ok) {
+        // Silently handle errors - Home Assistant might not be configured
+        if (response.status === 500 || response.status === 404) {
+          setDevices([]);
+          setLoading(false);
+          return;
+        }
+        throw new Error('Failed to fetch devices');
+      }
+      
       const data = await response.json();
-      console.log('Devices data:', data);
       setDevices(data.devices || []);
       setLoading(false);
     } catch (err) {
-      console.error('Error fetching devices:', err);
-      setError('Could not load devices');
+      // Silently fail if Home Assistant isn't configured
+      setDevices([]);
       setLoading(false);
     }
   };
@@ -55,7 +61,7 @@ export const SmartHomeWidget: React.FC<SmartHomeWidgetProps> = () => {
     ));
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/smarthome/toggle`, {
+      const response = await fetch(`${apiUrl}/api/smarthome/toggle`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

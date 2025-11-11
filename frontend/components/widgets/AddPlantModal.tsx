@@ -1,15 +1,15 @@
 import React, { useState, FormEvent } from 'react';
 import { X, Upload, Sprout } from 'lucide-react';
 import { THEME } from '@/lib/theme';
-import { API_BASE_URL } from '@/lib/config';
 
 interface AddPlantModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPlantAdded: () => void;
+  apiUrl: string;
 }
 
-export const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onPlantAdded }) => {
+export const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, onPlantAdded, apiUrl }) => {
   const [name, setName] = useState('');
   const [species, setSpecies] = useState('');
   const [wateringDays, setWateringDays] = useState('7');
@@ -19,11 +19,14 @@ export const AddPlantModal: React.FC<AddPlantModalProps> = ({ isOpen, onClose, o
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    
+    if (!apiUrl) return;
+    
     setError('');
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/plants/`, {
+      const response = await fetch(`${apiUrl}/api/plants/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -7,33 +7,17 @@ import { FinanceEntry } from '@/lib/types';
 
 interface FinanceWidgetProps {
   isClient: boolean;
+  apiUrl?: string;
 }
 
 export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
   isClient,
+  apiUrl,
 }) => {
-  const LOCAL_API = "http://192.168.4.28:8000";
-  const REMOTE_API = "https://todd-browser-troubleshooting-helmet.trycloudflare.com";
-  const [apiUrl, setApiUrl] = useState<string>(LOCAL_API);
   const [connected, setConnected] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(false);
   const [balance, setBalance] = useState<string>("£0.00");
   const [financeData, setFinanceData] = useState<FinanceEntry[]>([]);
-
-  // Detect API URL
-  useEffect(() => {
-    const detectApi = async () => {
-      try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 500);
-        await fetch(`${LOCAL_API}/docs`, { method: 'HEAD', signal: controller.signal });
-        setApiUrl(LOCAL_API);
-      } catch {
-        setApiUrl(REMOTE_API);
-      }
-    };
-    detectApi();
-  }, []);
 
   // Check Monzo connection status
   useEffect(() => {

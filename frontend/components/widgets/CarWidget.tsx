@@ -3,8 +3,9 @@ import { Car as CarIcon, Wrench, AlertTriangle, Plus, X, Calendar, Gauge } from 
 import { Card, CardHeader, CardContent } from '../Card';
 import { THEME } from '@/lib/theme';
 
-const LOCAL_API = "http://192.168.4.28:8000";
-const REMOTE_API = "https://todd-browser-troubleshooting-helmet.trycloudflare.com";
+interface CarWidgetProps {
+  apiUrl?: string;
+}
 
 interface Car {
   id?: number;
@@ -47,11 +48,10 @@ interface MaintenanceRecord {
   notes?: string;
 }
 
-export const CarWidget: React.FC = () => {
+export const CarWidget: React.FC<CarWidgetProps> = ({ apiUrl }) => {
   const [cars, setCars] = useState<Car[]>([]);
   const [selectedCar, setSelectedCar] = useState<Car | null>(null);
   const [loading, setLoading] = useState(true);
-  const [apiUrl, setApiUrl] = useState<string>(LOCAL_API);
   const [showAddRecord, setShowAddRecord] = useState(false);
   const [showAddCar, setShowAddCar] = useState(false);
   const [lookupPlate, setLookupPlate] = useState('');
@@ -66,21 +66,6 @@ export const CarWidget: React.FC = () => {
     type: 'oil_change',
     maintenance_date: new Date().toISOString().split('T')[0],
   });
-
-  // Detect API URL
-  useEffect(() => {
-    const detectApi = async () => {
-      try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 500);
-        await fetch(`${LOCAL_API}/docs`, { method: 'HEAD', signal: controller.signal });
-        setApiUrl(LOCAL_API);
-      } catch {
-        setApiUrl(REMOTE_API);
-      }
-    };
-    detectApi();
-  }, []);
 
   const fetchCars = async () => {
     if (!apiUrl) return;

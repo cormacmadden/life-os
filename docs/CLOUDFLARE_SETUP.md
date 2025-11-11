@@ -18,16 +18,19 @@ With this setup:
 ## Step 1: Install Cloudflared
 
 ### Option A: Using Winget (Recommended)
+
 ```powershell
 winget install --id Cloudflare.cloudflared
 ```
 
 ### Option B: Manual Download
-1. Download from: https://github.com/cloudflare/cloudflared/releases/latest
+
+1. Download from: <https://github.com/cloudflare/cloudflared/releases/latest>
 2. Look for `cloudflared-windows-amd64.exe`
 3. Rename to `cloudflared.exe` and move to `C:\Windows\System32\`
 
 ### Verify Installation
+
 ```powershell
 cloudflared --version
 ```
@@ -75,6 +78,7 @@ ingress:
 ## Step 5: Route Your Tunnel
 
 ### Option A: Quick Start (Random URL - Free)
+
 ```powershell
 cloudflared tunnel run lifeos
 ```
@@ -82,6 +86,7 @@ cloudflared tunnel run lifeos
 This gives you a random URL like `https://random-name.trycloudflare.com`
 
 ### Option B: Custom Domain (Requires Domain)
+
 If you have a domain on Cloudflare:
 
 ```powershell
@@ -106,9 +111,12 @@ cloudflared service start
 ```
 
 To stop/uninstall:
+
 ```powershell
+
 cloudflared service stop
 cloudflared service uninstall
+
 ```
 
 ## Step 7: Update Your App Configuration

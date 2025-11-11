@@ -1,7 +1,7 @@
 // API Configuration with auto-detection for local/remote access
 
 const LOCAL_API_URL = 'http://192.168.4.28:8000';
-const REMOTE_API_URL = process.env.NEXT_PUBLIC_CLOUDFLARE_URL || 'http://127.0.0.1:8000';
+const REMOTE_API_URL =  process.env.NEXT_PUBLIC_CLOUDFLARE_URL || 'http://127.0.0.1:8000';
 const DETECTION_TIMEOUT = 500; // ms to wait before falling back to remote
 
 let detectedUrl: string | null = null;
@@ -68,6 +68,7 @@ export function resetApiUrlDetection(): void {
 
 // Simple export that checks environment variable or uses local
 // This is synchronous and will be used by widgets that need immediate access
+// Prioritize LOCAL_API_URL first since it's faster and the Cloudflare tunnel may not be running
 export const API_BASE_URL = typeof window !== 'undefined' 
-  ? (process.env.NEXT_PUBLIC_CLOUDFLARE_URL || LOCAL_API_URL)
+  ? LOCAL_API_URL
   : LOCAL_API_URL;

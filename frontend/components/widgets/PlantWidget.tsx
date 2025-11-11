@@ -3,10 +3,13 @@ import { Sprout, Droplets, Plus, Trash2 } from 'lucide-react';
 import { Card, CardHeader, CardContent } from '../Card';
 import { THEME } from '@/lib/theme';
 import { Plant } from '@/lib/types';
-import { API_BASE_URL } from '@/lib/config';
 import { AddPlantModal } from './AddPlantModal';
 
-export const PlantWidget = () => {
+interface PlantWidgetProps {
+  apiUrl: string;
+}
+
+export const PlantWidget: React.FC<PlantWidgetProps> = ({ apiUrl }) => {
   const [plants, setPlants] = useState<Plant[]>([]);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -14,10 +17,10 @@ export const PlantWidget = () => {
 
   const fetchPlants = () => {
     // Guard against server-side rendering
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !apiUrl) return;
 
     setLoading(true);
-    fetch(`${API_BASE_URL}/api/plants`)
+    fetch(`${apiUrl}/api/plants`)
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {
@@ -39,10 +42,12 @@ export const PlantWidget = () => {
     fetchPlants();
   };
 
-  const handleDeletePlant = async (plantId: number) => {
+  const handleDelete = async (plantId: number) => {
+    if (!apiUrl) return;
+    
     setDeletingId(plantId);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/plants/${plantId}`, {
+      const response = await fetch(`${apiUrl}/api/plants/${plantId}`, {
         method: 'DELETE',
       });
       
@@ -50,7 +55,7 @@ export const PlantWidget = () => {
         throw new Error('Failed to delete plant');
       }
       
-      fetchPlants();
+      await fetchPlants(); // Refresh the list
     } catch (err) {
       console.error('Failed to delete plant:', err);
     } finally {
@@ -128,7 +133,7 @@ export const PlantWidget = () => {
                       <span className={`text-xs ${THEME.main} opacity-50`}>happy</span>
                     )}
                     <button
-                      onClick={() => handleDeletePlant(plant.id)}
+                      onClick={() => handleDelete(plant.id)}
                       disabled={isDeleting}
                       className={`${THEME.sub} hover:${THEME.error} transition-colors p-1 disabled:opacity-50`}
                       title="Remove plant"
@@ -147,6 +152,7 @@ export const PlantWidget = () => {
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onPlantAdded={handlePlantAdded}
+        apiUrl={apiUrl}
       />
     </>
   );

@@ -25,6 +25,8 @@ export interface CalendarEvent {
   id: string | number;
   title: string;
   time: string;
+  date?: string; // ISO date string (YYYY-MM-DD)
+  day?: string; // Day name (e.g., "Monday")
   type: 'work' | 'personal';
 }
 
@@ -69,10 +71,14 @@ export interface IdentityState {
   name: string;
   occupation: string;
   homeLocation: string;
+  homeLatitude?: number;
+  homeLongitude?: number;
   workLocation: string;
+  workLatitude?: number;
+  workLongitude?: number;
   preferences: string;
   relevantRoutes: string[];
-  [key: string]: string | string[];
+  [key: string]: string | string[] | number | undefined;
 }
 
 export interface ChatMessage {

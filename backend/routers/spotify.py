@@ -174,7 +174,7 @@ async def get_current_track():
     token = await get_valid_token()
     
     if not token:
-        print("No valid token found")
+        # print("No valid token found")  # Commented to reduce log noise
         return {
             "authenticated": False,
             "playing": False
@@ -188,7 +188,7 @@ async def get_current_track():
                 headers={"Authorization": f"Bearer {token}"}
             )
             
-            print(f"Spotify /me/player Response Status: {response.status_code}")
+            # print(f"Spotify /me/player Response Status: {response.status_code}")  # Commented to reduce log noise
             
             if response.status_code == 204:
                 # No active device
@@ -204,14 +204,14 @@ async def get_current_track():
                 
                 # For episodes/podcasts, use currently-playing endpoint instead
                 if currently_playing_type == "episode" or not data.get("item"):
-                    print(f"Detected episode/podcast, fetching from currently-playing endpoint")
+                    # print(f"Detected episode/podcast, fetching from currently-playing endpoint")  # Commented to reduce log noise
                     # Try the currently-playing endpoint for episodes
                     response2 = await client.get(
                         "https://api.spotify.com/v1/me/player/currently-playing",
                         headers={"Authorization": f"Bearer {token}"}
                     )
                     
-                    print(f"Currently-playing response status: {response2.status_code}")
+                    # print(f"Currently-playing response status: {response2.status_code}")  # Commented to reduce log noise
                     
                     if response2.status_code == 200:
                         episode_data = response2.json()
@@ -240,7 +240,7 @@ async def get_current_track():
                             }
                         else:
                             # Spotify isn't returning episode details - show generic message
-                            print("Spotify API returned null item for episode")
+                            # print("Spotify API returned null item for episode")  # Commented to reduce log noise
                             return {
                                 "authenticated": True,
                                 "playing": data.get("is_playing", False),

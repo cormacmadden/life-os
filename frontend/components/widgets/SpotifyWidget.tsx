@@ -3,8 +3,9 @@ import { Music, Play, Pause, SkipForward, SkipBack, Link2, Volume2, ChevronDown,
 import { Card, CardHeader, CardContent } from '../Card';
 import { THEME } from '@/lib/theme';
 
-const LOCAL_API = "http://192.168.4.28:8000";
-const REMOTE_API = "https://todd-browser-troubleshooting-helmet.trycloudflare.com";
+interface SpotifyWidgetProps {
+  apiUrl?: string;
+}
 
 interface SpotifyTrackData {
   authenticated: boolean;
@@ -30,34 +31,18 @@ interface QueueItem {
   duration_ms?: number;
 }
 
-export const SpotifyWidget: React.FC = () => {
+export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
   const [spotifyData, setSpotifyData] = useState<SpotifyTrackData>({
     authenticated: false,
     playing: false,
   });
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [apiUrl, setApiUrl] = useState<string>(LOCAL_API);
   const [volume, setVolume] = useState<number>(50);
   const [queueExpanded, setQueueExpanded] = useState<boolean>(false);
 
-  // Detect API URL on mount
-  useEffect(() => {
-    const detectApi = async () => {
-      try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 500);
-        await fetch(`${LOCAL_API}/docs`, { method: 'HEAD', signal: controller.signal });
-        setApiUrl(LOCAL_API);
-      } catch {
-        setApiUrl(REMOTE_API);
-      }
-    };
-    detectApi();
-  }, []);
-
   const fetchCurrentTrack = async () => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || !apiUrl) return;
     
     try {
       const response = await fetch(`${apiUrl}/api/spotify/current-track`);

@@ -60,3 +60,21 @@ class MaintenanceRecord(SQLModel, table=True):
     notes: Optional[str] = None
     
     car: Optional[Car] = Relationship(back_populates="maintenance_records")
+
+class UserConfig(SQLModel, table=True):
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(default=1)  # Single user system for now
+    
+    # Transport settings
+    morning_bus_stops: Optional[str] = None  # Comma-separated
+    evening_bus_stops: Optional[str] = None  # Comma-separated
+    relevant_routes: Optional[str] = None  # Comma-separated
+    
+    # Personal info
+    home_address: Optional[str] = None
+    home_latitude: Optional[float] = None
+    home_longitude: Optional[float] = None
+    work_address: Optional[str] = None
+    work_latitude: Optional[float] = None
+    work_longitude: Optional[float] = None

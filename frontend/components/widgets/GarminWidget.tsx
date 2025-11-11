@@ -4,8 +4,9 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, TooltipPro
 import { Card, CardHeader, CardContent } from '../Card';
 import { THEME } from '@/lib/theme';
 
-const LOCAL_API = "http://192.168.4.28:8000";
-const REMOTE_API = "https://todd-browser-troubleshooting-helmet.trycloudflare.com";
+interface GarminWidgetProps {
+  apiUrl?: string;
+}
 
 interface GarminStats {
   steps: number;
@@ -48,31 +49,16 @@ interface GarminBody {
   max_stress: number | null;
 }
 
-export const GarminWidget: React.FC = () => {
+export const GarminWidget: React.FC<GarminWidgetProps> = ({ apiUrl }) => {
   const [stats, setStats] = useState<GarminStats | null>(null);
   const [sleepHistory, setSleepHistory] = useState<GarminSleep[]>([]);
   const [activities, setActivities] = useState<GarminActivity[]>([]);
   const [body, setBody] = useState<GarminBody | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [apiUrl, setApiUrl] = useState<string>(LOCAL_API);
-
-  // Detect API URL on mount
-  useEffect(() => {
-    const detectApi = async () => {
-      try {
-        const controller = new AbortController();
-        setTimeout(() => controller.abort(), 500);
-        await fetch(`${LOCAL_API}/docs`, { method: 'HEAD', signal: controller.signal });
-        setApiUrl(LOCAL_API);
-      } catch {
-        setApiUrl(REMOTE_API);
-      }
-    };
-    detectApi();
-  }, []);
 
   const fetchGarminData = async () => {
+    if (!apiUrl) return;
     // Check if we have cached data from less than 15 minutes ago
     const cachedData = localStorage.getItem('garminData');
     const cachedTimestamp = localStorage.getItem('garminDataTimestamp');
@@ -104,6 +90,14 @@ export const GarminWidget: React.FC = () => {
         fetch(`${apiUrl}/api/garmin/body`)
       ]);
 
+      // Check if any authentication errors
+      if (statsRes.status === 401 || statsRes.status === 503) {
+        const errorData = await statsRes.json();
+        setError('Garmin authentication required');
+        setLoading(false);
+        return;
+      }
+
       const statsData = statsRes.ok ? await statsRes.json() : null;
       const sleepData = sleepRes.ok ? await sleepRes.json() : [];
       const activitiesData = activitiesRes.ok ? await activitiesRes.json() : [];
@@ -126,7 +120,7 @@ export const GarminWidget: React.FC = () => {
       setError(null);
     } catch (err) {
       console.error('Failed to fetch Garmin data:', err);
-      setError('Failed to connect to Garmin');
+      setError('Garmin temporarily unavailable');
     } finally {
       setLoading(false);
     }
@@ -167,8 +161,11 @@ export const GarminWidget: React.FC = () => {
       <Card>
         <CardHeader title="garmin" icon={Activity} />
         <CardContent>
-          <div className={`p-4 ${THEME.bg} rounded text-center`}>
+          <div className={`p-4 ${THEME.bg} rounded text-center space-y-2`}>
             <p className={`${THEME.sub} text-sm`}>{error}</p>
+            <p className={`${THEME.sub} text-xs opacity-70`}>
+              Widget disabled - authentication needed
+            </p>
           </div>
         </CardContent>
       </Card>

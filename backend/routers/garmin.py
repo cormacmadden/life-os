@@ -38,6 +38,16 @@ def set_cache(key, data):
 
 def get_garmin_client():
     """Get authenticated Garmin client."""
+    client = Garmin()
+    
+    # Try to load saved session first
+    try:
+        client.garth.load(TOKEN_DIR)
+        return client
+    except Exception as e:
+        print(f"Failed to load saved session: {e}")
+    
+    # If loading session fails, try to login with credentials
     try:
         client = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
         client.login()
@@ -47,13 +57,8 @@ def get_garmin_client():
         
         return client
     except Exception as e:
-        # Try to load saved session
-        try:
-            client = Garmin()
-            client.garth.load(TOKEN_DIR)
-            return client
-        except:
-            raise HTTPException(status_code=401, detail=f"Failed to authenticate with Garmin: {str(e)}")
+        print(f"Failed to login with credentials: {e}")
+        raise HTTPException(status_code=401, detail=f"Failed to authenticate with Garmin. Please check your credentials and try again: {str(e)}")
 
 @router.get("/stats")
 async def get_stats():
@@ -97,11 +102,16 @@ async def get_stats():
         # Cache the result
         set_cache(cache_key, result)
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error fetching Garmin stats: {e}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = str(e)
+        if "401" in error_msg or "Unauthorized" in error_msg:
+            raise HTTPException(status_code=503, detail="Garmin authentication expired. Please re-authenticate by running: python backend/authenticate_garmin.py")
+        raise HTTPException(status_code=500, detail=f"Garmin API error: {error_msg}")
 
 @router.get("/sleep")
 async def get_sleep(days: int = 7):
@@ -247,3 +257,28 @@ async def get_body_metrics():
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/status")
+async def get_status():
+    """Check if Garmin authentication is working."""
+    try:
+        # Try to load saved session
+        client = Garmin()
+        client.garth.load(TOKEN_DIR)
+        
+        # Try a simple API call to verify
+        from datetime import date
+        stats = client.get_stats(date.today().isoformat())
+        
+        return {
+            "authenticated": True,
+            "message": "Garmin is connected",
+            "has_data": stats is not None
+        }
+    except Exception as e:
+        return {
+            "authenticated": False,
+            "message": "Garmin authentication required",
+            "error": str(e),
+            "instructions": "Run: python backend/authenticate_garmin.py"
+        }

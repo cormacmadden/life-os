@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, FormEvent } from 'react';
+import dynamic from 'next/dynamic';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
 import {
   Home,
@@ -28,21 +29,86 @@ import {
   Terminal,
   LucideIcon,
   Link2,
-  Unlink2
+  Unlink2,
+  Activity
 } from 'lucide-react';
 
 import { THEME } from '@/lib/theme';
 import { BusData, HomeState, Plant, CalendarEvent, Email, GoogleData, FinanceEntry, SpotifyState, ChatMessage, IdentityState} from '@/lib/types';
 import { Card, CardHeader, CardContent } from '@/components/Card';
-import { PlantWidget } from '@/components/widgets/PlantWidget';
-import { BusWidget } from '@/components/widgets/BusWidget';
-import { SpotifyWidget } from '@/components/widgets/SpotifyWidget';
-import { SmartHomeWidget } from '@/components/widgets/SmartHomeWidget';
-import { CalendarWidget } from '@/components/widgets/CalendarWidget';
-import { FinanceWidget } from '@/components/widgets/FinanceWidget';
-import { EmailWidget } from '@/components/widgets/EmailWidget';
-import { GarminWidget } from '@/components/widgets/GarminWidget';
-import { CarWidget } from '@/components/widgets/CarWidget';
+
+// Loading component for lazy-loaded widgets
+const WidgetLoading = ({ title, icon: Icon }: { title: string; icon: LucideIcon }) => (
+  <Card>
+    <CardHeader title={title} icon={Icon} />
+    <CardContent>
+      <div className={`p-4 ${THEME.bg} rounded text-center min-h-[150px] flex items-center justify-center`}>
+        <p className={`${THEME.sub} text-sm`}>loading...</p>
+      </div>
+    </CardContent>
+  </Card>
+);
+
+// Lazy load widgets for better initial load performance
+const PlantWidget = dynamic(() => import('@/components/widgets/PlantWidget').then(mod => ({ default: mod.PlantWidget })), {
+  loading: () => <WidgetLoading title="plants" icon={Home} />,
+  ssr: false
+});
+
+const BusWidget = dynamic(() => import('@/components/widgets/BusWidget').then(mod => ({ default: mod.BusWidget })), {
+  loading: () => <WidgetLoading title="bus" icon={Bus} />,
+  ssr: false
+});
+
+const SpotifyWidget = dynamic(() => import('@/components/widgets/SpotifyWidget').then(mod => ({ default: mod.SpotifyWidget })), {
+  loading: () => <WidgetLoading title="spotify" icon={Music} />,
+  ssr: false
+});
+
+const SmartHomeWidget = dynamic(() => import('@/components/widgets/SmartHomeWidget').then(mod => ({ default: mod.SmartHomeWidget })), {
+  loading: () => <WidgetLoading title="smart home" icon={Home} />,
+  ssr: false
+});
+
+const CalendarWidget = dynamic(() => import('@/components/widgets/CalendarWidget').then(mod => ({ default: mod.CalendarWidget })), {
+  loading: () => <WidgetLoading title="calendar" icon={Calendar} />,
+  ssr: false
+});
+
+const AgendaWidget = dynamic(() => import('@/components/widgets/AgendaWidget').then(mod => ({ default: mod.AgendaWidget })), {
+  loading: () => <WidgetLoading title="agenda" icon={Calendar} />,
+  ssr: false
+});
+
+const FinanceWidget = dynamic(() => import('@/components/widgets/FinanceWidget').then(mod => ({ default: mod.FinanceWidget })), {
+  loading: () => <WidgetLoading title="finance" icon={CreditCard} />,
+  ssr: false
+});
+
+const EmailWidget = dynamic(() => import('@/components/widgets/EmailWidget').then(mod => ({ default: mod.EmailWidget })), {
+  loading: () => <WidgetLoading title="email" icon={Mail} />,
+  ssr: false
+});
+
+const GarminWidget = dynamic(() => import('@/components/widgets/GarminWidget').then(mod => ({ default: mod.GarminWidget })), {
+  loading: () => <WidgetLoading title="garmin" icon={Activity} />,
+  ssr: false
+});
+
+const CarWidget = dynamic(() => import('@/components/widgets/CarWidget').then(mod => ({ default: mod.CarWidget })), {
+  loading: () => <WidgetLoading title="car" icon={Home} />,
+  ssr: false
+});
+
+const WeatherWidget = dynamic(() => import('@/components/widgets/WeatherWidget').then(mod => ({ default: mod.WeatherWidget })), {
+  loading: () => <WidgetLoading title="weather" icon={Thermometer} />,
+  ssr: false
+});
+
+const BusMapWidget = dynamic(() => import('@/components/widgets/BusMapWidget').then(mod => ({ default: mod.BusMapWidget })), {
+  loading: () => <WidgetLoading title="bus map" icon={Bus} />,
+  ssr: false
+});
 
 // --- Types & Interfaces ---
 type TabId = 'dashboard' | 'ai' | 'settings';
@@ -88,22 +154,39 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
 
-  // Widget visibility settings
-  const [widgetVisibility, setWidgetVisibility] = useState({
-    bus: true,
-    spotify: true,
-    garmin: true,
-    calendar: true,
-    smarthome: true,
-    plants: true,
-    car: true,
-    finance: true,
-    email: true,
+  // Widget visibility settings - load from localStorage
+  const [widgetVisibility, setWidgetVisibility] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('widgetVisibility');
+      if (saved) {
+        return JSON.parse(saved);
+      }
+    }
+    return {
+      bus: true,
+      busMap: true,
+      spotify: true,
+      garmin: true,
+      calendar: true,
+      smarthome: true,
+      plants: true,
+      car: true,
+      finance: true,
+      email: true,
+      weather: true,
+    };
   });
+
+  // Save widget visibility to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('widgetVisibility', JSON.stringify(widgetVisibility));
+    }
+  }, [widgetVisibility]);
 
   // API URL with fallback to Cloudflare
   const LOCAL_API = "http://192.168.4.28:8000";
-  const REMOTE_API = "https://todd-browser-troubleshooting-helmet.trycloudflare.com";
+  const REMOTE_API = process.env.NEXT_PUBLIC_CLOUDFLARE_URL || "https://life-os-dashboard.com";
   const [API_BASE_URL, setApiBaseUrl] = useState<string>(LOCAL_API);
 
   // DATA STATES
@@ -111,6 +194,7 @@ export default function App() {
   const [isBusLoading, setIsBusLoading] = useState<boolean>(false);
   const [activeBusTab, setActiveBusTab] = useState<'workbound' | 'homebound'>('workbound');
   const [lastBusRefresh, setLastBusRefresh] = useState<Date | null>(null);
+  const busMapRef = useRef<{ refresh: () => void; showRoute: (routeName: string) => void; showBusLocation: (routeName: string, destination?: string) => void }>(null);
   const [googleData, setGoogleData] = useState<GoogleData>({ authenticated: false });
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const [spotifyAuthenticated, setSpotifyAuthenticated] = useState<boolean>(false);
@@ -132,33 +216,55 @@ export default function App() {
   ]);
   const [chatInput, setChatInput] = useState<string>('');
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [saveButtonState, setSaveButtonState] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [geocodeStatus, setGeocodeStatus] = useState<{
+    home: { lat: number | null; lng: number | null } | null;
+    work: { lat: number | null; lng: number | null } | null;
+  }>({ home: null, work: null });
+  const [configLoading, setConfigLoading] = useState<boolean>(true);
 
   // --- EFFECTS & FETCHING ---
 
   useEffect(() => {
     setIsClient(true);
     
-    // Detect if local API is available, fallback to Cloudflare
-    const detectApiUrl = async () => {
+    // Set local API immediately and check in background
+    console.log('🔍 Trying local API first:', LOCAL_API);
+    setApiBaseUrl(LOCAL_API);
+    
+    // Quick background check - if local fails, switch to remote
+    const verifyApiUrl = async () => {
+      const startTime = Date.now();
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 500);
+        const timeoutId = setTimeout(() => controller.abort(), 200); // 10 seconds
         
-        await fetch(`${LOCAL_API}/docs`, {
-          method: 'HEAD',
+        console.log('⏱️ Starting API health check...');
+        const response = await fetch(`${LOCAL_API}/health`, {
+          method: 'GET',
           signal: controller.signal,
+          cache: 'no-store',
         });
         
         clearTimeout(timeoutId);
-        console.log('✅ Using local API:', LOCAL_API);
-        setApiBaseUrl(LOCAL_API);
-      } catch {
-        console.log('🌐 Using remote API:', REMOTE_API);
+        const elapsed = Date.now() - startTime;
+        
+        if (response.ok) {
+          console.log(`✅ Local API confirmed working (${elapsed}ms)`);
+        } else {
+          console.log(`⚠️ Local API returned ${response.status}, switching to remote`);
+          setApiBaseUrl(REMOTE_API);
+        }
+      } catch (error) {
+        const elapsed = Date.now() - startTime;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        console.log(`🌐 Local API failed after ${elapsed}ms:`, errorMsg);
+        console.log('Switching to remote:', REMOTE_API);
         setApiBaseUrl(REMOTE_API);
       }
     };
     
-    detectApiUrl();
+    verifyApiUrl();
   }, []);
 
   // Fetch integration statuses once API URL is detected
@@ -182,6 +288,10 @@ export default function App() {
          setBusData(data); 
          setIsBusLoading(false); 
          setLastBusRefresh(new Date());
+         // Also refresh the bus map
+         if (busMapRef.current) {
+           busMapRef.current.refresh();
+         }
        })
        .catch(e => { 
          console.error(e); 
@@ -274,6 +384,94 @@ export default function App() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
+  // Load user config on mount
+  useEffect(() => {
+    const loadUserConfig = async () => {
+      if (!API_BASE_URL) return;
+      
+      console.log('⏳ Loading user config from:', API_BASE_URL);
+      setConfigLoading(true);
+      
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/user/config`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('✅ User config loaded:', data);
+          
+          // Map backend fields to frontend identity fields
+          setIdentity(prev => ({
+            ...prev,
+            homeLocation: data.home_address || prev.homeLocation,
+            workLocation: data.work_address || prev.workLocation,
+            relevantRoutes: data.relevant_routes ? data.relevant_routes.split(',').map((s: string) => s.trim()).filter(Boolean) : prev.relevantRoutes
+          }));
+          
+          // Store geocode status
+          setGeocodeStatus({
+            home: data.home_latitude && data.home_longitude 
+              ? { lat: data.home_latitude, lng: data.home_longitude }
+              : null,
+            work: data.work_latitude && data.work_longitude
+              ? { lat: data.work_latitude, lng: data.work_longitude }
+              : null
+          });
+        } else {
+          console.error('❌ Failed to load config, status:', response.status);
+        }
+      } catch (error) {
+        console.error('❌ Error loading user config:', error);
+      } finally {
+        setConfigLoading(false);
+      }
+    };
+    
+    loadUserConfig();
+  }, [API_BASE_URL]);
+
+  const saveUserConfig = async () => {
+    setSaveButtonState('saving');
+    try {
+      const configData = {
+        home_address: identity.homeLocation,
+        work_address: identity.workLocation,
+        relevant_routes: identity.relevantRoutes.join(', '),
+        morning_bus_stops: '', // Add these if you have them in identity
+        evening_bus_stops: ''
+      };
+      
+      const response = await fetch(`${API_BASE_URL}/api/user/config`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(configData)
+      });
+      
+      if (response.ok) {
+        const result = await response.json();
+        // Update geocode status from response
+        if (result.config) {
+          setGeocodeStatus({
+            home: result.config.home_latitude && result.config.home_longitude
+              ? { lat: result.config.home_latitude, lng: result.config.home_longitude }
+              : null,
+            work: result.config.work_latitude && result.config.work_longitude
+              ? { lat: result.config.work_latitude, lng: result.config.work_longitude }
+              : null
+          });
+        }
+        setSaveButtonState('success');
+        setTimeout(() => setSaveButtonState('idle'), 2000);
+      } else {
+        setSaveButtonState('error');
+        setTimeout(() => setSaveButtonState('idle'), 2000);
+      }
+    } catch (error) {
+      console.error('Error saving user config:', error);
+      setSaveButtonState('error');
+      setTimeout(() => setSaveButtonState('idle'), 2000);
+    }
+  };
+
   const handleChatSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
@@ -308,42 +506,61 @@ export default function App() {
   const currentCalendar = googleData.authenticated && googleData.calendar ? googleData.calendar : MOCK_CALENDAR;
 
   const renderDashboard = () => (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-      {/* COL 1 */}
-      <div className="col-span-1 md:col-span-2 xl:col-span-1 space-y-6">
-        {widgetVisibility.bus && (
-          <BusWidget
-            busData={busData}
-            activeBusTab={activeBusTab}
-            setActiveBusTab={setActiveBusTab}
-            isBusLoading={isBusLoading}
-            fetchBusData={fetchBusData}
-            relevantRoutes={identity.relevantRoutes}
-            lastRefresh={lastBusRefresh}
-          />
-        )}
-        {widgetVisibility.spotify && <SpotifyWidget />}
+    <div className="space-y-6">
+      {/* Full-width Calendar at top */}
+      <div className="w-full">
+        <CalendarWidget calendar={currentCalendar} isAuthenticated={googleData.authenticated} />
       </div>
 
-      {/* COL 2 */}
-      <div className="col-span-1 space-y-6">
-        {widgetVisibility.garmin && <GarminWidget />}
-        {widgetVisibility.smarthome && (
-          <SmartHomeWidget homeState={homeState} handleSmartHomeToggle={handleSmartHomeToggle} />
-        )}
-        {widgetVisibility.calendar && (
-          <CalendarWidget calendar={currentCalendar} isAuthenticated={googleData.authenticated} />
-        )}
-        {widgetVisibility.plants && <PlantWidget />}
-      </div>
+      {/* Three column grid below */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+        {/* COL 1 */}
+        <div className="col-span-1 md:col-span-2 xl:col-span-1 space-y-6">
+          {widgetVisibility.bus && (
+            <BusWidget
+              busData={busData}
+              activeBusTab={activeBusTab}
+              setActiveBusTab={setActiveBusTab}
+              isBusLoading={isBusLoading}
+              fetchBusData={fetchBusData}
+              relevantRoutes={identity.relevantRoutes}
+              lastRefresh={lastBusRefresh}
+              onBusClick={(route, destination) => {
+                console.log(`Showing bus ${route} to ${destination} on map`);
+                busMapRef.current?.showBusLocation(route, destination);
+              }}
+            />
+          )}
+          {widgetVisibility.busMap && API_BASE_URL && (
+            <BusMapWidget 
+              ref={busMapRef}
+              apiUrl={API_BASE_URL}
+            />
+          )}
+          {widgetVisibility.spotify && <SpotifyWidget apiUrl={API_BASE_URL} />}
+        </div>
 
-      {/* COL 3 */}
-      <div className="col-span-1 space-y-6">
-        {widgetVisibility.car && <CarWidget />}
-        {widgetVisibility.finance && <FinanceWidget isClient={isClient} />}
-        {widgetVisibility.email && (
-          <EmailWidget emails={currentEmails} isAuthenticated={googleData.authenticated} />
-        )}
+        {/* COL 2 */}
+        <div className="col-span-1 space-y-6">
+          {widgetVisibility.weather && <WeatherWidget apiUrl={API_BASE_URL} />}
+          {widgetVisibility.garmin && <GarminWidget apiUrl={API_BASE_URL} />}
+          {widgetVisibility.smarthome && (
+            <SmartHomeWidget apiUrl={API_BASE_URL} homeState={homeState} handleSmartHomeToggle={handleSmartHomeToggle} />
+          )}
+          {widgetVisibility.calendar && (
+            <AgendaWidget calendar={currentCalendar} isAuthenticated={googleData.authenticated} />
+          )}
+          {widgetVisibility.plants && <PlantWidget apiUrl={API_BASE_URL} />}
+        </div>
+
+        {/* COL 3 */}
+        <div className="col-span-1 space-y-6">
+          {widgetVisibility.car && <CarWidget apiUrl={API_BASE_URL} />}
+          {widgetVisibility.finance && <FinanceWidget isClient={isClient} apiUrl={API_BASE_URL} />}
+          {widgetVisibility.email && (
+            <EmailWidget emails={currentEmails} isAuthenticated={googleData.authenticated} />
+          )}
+        </div>
       </div>
     </div>
   );
@@ -417,13 +634,74 @@ export default function App() {
         <CardHeader title="user_config" icon={User} />
         <CardContent className="space-y-6 p-6">
           <div className={`text-sm ${THEME.sub} ${THEME.bg} p-3 rounded border-l-2 border-[#e2b714]`}>// this config loads into the terminal assistant</div>
+          {configLoading && (
+            <div className={`text-xs ${THEME.main} ${THEME.bg} p-2 rounded flex items-center gap-2`}>
+              <RefreshCw size={14} className="animate-spin" />
+              <span>Loading configuration...</span>
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {['name', 'occupation', 'homeLocation', 'workLocation'].map((field) => (
+            {['name', 'occupation'].map((field) => (
                <div key={field}><label className={`block text-xs ${THEME.main} mb-2`}>{field}</label><input type="text" value={identity[field] as string} onChange={e => setIdentity({...identity, [field]: e.target.value})} className={`w-full p-2 rounded ${THEME.bg} ${THEME.text} outline-none focus:ring-1 focus:ring-[#e2b714]`} /></div>
             ))}
+            <div>
+              <label className={`block text-xs ${THEME.main} mb-2 flex items-center justify-between`}>
+                <span>home_address</span>
+                {geocodeStatus.home && geocodeStatus.home.lat !== null && geocodeStatus.home.lng !== null && (
+                  <span className="text-green-500 flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    <span className="text-[10px]">({geocodeStatus.home.lat.toFixed(4)}, {geocodeStatus.home.lng.toFixed(4)})</span>
+                  </span>
+                )}
+                {identity.homeLocation && !geocodeStatus.home && saveButtonState === 'idle' && (
+                  <span className="text-amber-500 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    <span className="text-[10px]">not geocoded</span>
+                  </span>
+                )}
+              </label>
+              <input type="text" value={identity.homeLocation} onChange={e => setIdentity({...identity, homeLocation: e.target.value})} placeholder="e.g., Leamington Spa, UK" className={`w-full p-2 rounded ${THEME.bg} ${THEME.text} outline-none focus:ring-1 focus:ring-[#e2b714]`} />
+            </div>
+            <div>
+              <label className={`block text-xs ${THEME.main} mb-2 flex items-center justify-between`}>
+                <span>work_address</span>
+                {geocodeStatus.work && geocodeStatus.work.lat !== null && geocodeStatus.work.lng !== null && (
+                  <span className="text-green-500 flex items-center gap-1">
+                    <CheckCircle2 size={12} />
+                    <span className="text-[10px]">({geocodeStatus.work.lat.toFixed(4)}, {geocodeStatus.work.lng.toFixed(4)})</span>
+                  </span>
+                )}
+                {identity.workLocation && !geocodeStatus.work && saveButtonState === 'idle' && (
+                  <span className="text-amber-500 flex items-center gap-1">
+                    <AlertCircle size={12} />
+                    <span className="text-[10px]">not geocoded</span>
+                  </span>
+                )}
+              </label>
+              <input type="text" value={identity.workLocation} onChange={e => setIdentity({...identity, workLocation: e.target.value})} placeholder="e.g., University of Warwick, UK" className={`w-full p-2 rounded ${THEME.bg} ${THEME.text} outline-none focus:ring-1 focus:ring-[#e2b714]`} />
+            </div>
             <div className="md:col-span-2"><label className={`block text-xs ${THEME.main} mb-2`}>relevant_routes</label><input type="text" value={identity.relevantRoutes.join(", ")} onChange={e => setIdentity({...identity, relevantRoutes: e.target.value.split(",").map(s => s.trim())})} className={`w-full p-2 rounded ${THEME.bg} ${THEME.text} outline-none focus:ring-1 focus:ring-[#e2b714]`} /></div>
              <div className="md:col-span-2"><label className={`block text-xs ${THEME.main} mb-2`}>preferences</label><textarea rows={4} value={identity.preferences} onChange={e => setIdentity({...identity, preferences: e.target.value})} className={`w-full p-2 rounded ${THEME.bg} ${THEME.text} outline-none focus:ring-1 focus:ring-[#e2b714] resize-none`} /></div>
           </div>
+          <div className={`text-xs ${THEME.sub} ${THEME.bg} p-2 rounded`}>💡 Addresses will be automatically geocoded to map coordinates when saved</div>
+          <button 
+            onClick={saveUserConfig}
+            disabled={saveButtonState === 'saving'}
+            className={`w-full py-3 rounded font-medium transition-all border ${
+              saveButtonState === 'success' 
+                ? 'bg-green-600 text-white border-green-600' 
+                : saveButtonState === 'error'
+                ? 'bg-red-600 text-white border-red-600'
+                : saveButtonState === 'saving'
+                ? `${THEME.bg} ${THEME.sub} border-[#646669] cursor-not-allowed`
+                : `${THEME.bg} ${THEME.main} border-[#e2b714] hover:bg-[#e2b714] hover:text-black`
+            }`}
+          >
+            {saveButtonState === 'saving' && 'Saving...'}
+            {saveButtonState === 'success' && '✓ Saved Successfully'}
+            {saveButtonState === 'error' && '✗ Save Failed'}
+            {saveButtonState === 'idle' && 'Save Settings'}
+          </button>
         </CardContent>
       </Card>
     </div>

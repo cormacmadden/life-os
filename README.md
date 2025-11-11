@@ -2,25 +2,30 @@
 
 A cyberpunk-themed personal dashboard that integrates with various services including Spotify, Garmin Connect, Google Calendar, Home Assistant, and more.
 
+> **📋 [View the Development Roadmap](./ROADMAP.md)** - See what's planned and contribute ideas!
+
 ## Features
 
-- 🚌 **Bus Tracking** - Real-time bus arrivals
+- 🚌 **Bus Tracking** - Real-time bus arrivals with map visualization
 - 🎵 **Spotify Integration** - Currently playing track with playback controls
 - 🏃 **Garmin Connect** - Activity stats, sleep tracking, and workout history
 - 🏠 **Smart Home** - Control lights and check temperature via Home Assistant
-- 📅 **Calendar** - Google Calendar events
-- 💰 **Finance** - Spending tracker
-- 🌱 **Plant Care** - Track plant watering schedules
-- 📧 **Email** - Unread email notifications
+- 📅 **7-Day Calendar** - Week view with office day indicators
+- 💰 **Finance** - Monzo account balance and spending insights
+- 🌱 **Plant Care** - Track plant watering schedules with images
+- 📧 **Email** - Gmail inbox preview
+- 🌤️ **Weather** - Multi-city weather display
+- 🚗 **Car Management** - MOT, tax, and mileage tracking
 
 ## Prerequisites
 
-- Python 3.9+
+- Python 3.9+ (tested using version 3.13)
 - Node.js 16+
+### Optional Accounts
 - A Garmin Connect account
-- Spotify account (optional)
-- Google account (optional)
-- Home Assistant instance (optional)
+- Spotify account
+- Google account
+- Home Assistant instance
 
 ## Quick Setup
 

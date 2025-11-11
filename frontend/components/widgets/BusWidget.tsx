@@ -12,6 +12,7 @@ interface BusWidgetProps {
   fetchBusData: (force?: boolean) => void;
   relevantRoutes: string[];
   lastRefresh: Date | null;
+  onBusClick?: (route: string, destination: string) => void;
 }
 
 export const BusWidget: React.FC<BusWidgetProps> = ({
@@ -22,6 +23,7 @@ export const BusWidget: React.FC<BusWidgetProps> = ({
   fetchBusData,
   relevantRoutes,
   lastRefresh,
+  onBusClick,
 }) => {
   const formatLastRefresh = () => {
     if (!lastRefresh) return 'never';
@@ -90,7 +92,8 @@ export const BusWidget: React.FC<BusWidgetProps> = ({
             .map((bus, idx) => (
               <div
                 key={idx}
-                className={`flex items-center justify-between p-3 ${THEME.bg} rounded transition-colors ${
+                onClick={() => onBusClick?.(bus.route, bus.destination)}
+                className={`flex items-center justify-between p-3 ${THEME.bg} rounded transition-colors cursor-pointer hover:opacity-80 ${
                   isBusLoading ? 'opacity-50' : 'opacity-100'
                 }`}
               >

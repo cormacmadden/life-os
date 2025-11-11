@@ -74,15 +74,45 @@ async def get_google_data():
         if "<" in sender: sender = sender.split("<")[0].strip().replace('"', '')
         email_data.append({"from": sender, "subject": subject, "time": "recent", "important": False, "id": msg['id']})
 
-    # 2. CALENDAR
+    # 2. CALENDAR - Get next 7 days of events
     calendar = build('calendar', 'v3', credentials=creds)
-    now = datetime.datetime.utcnow().isoformat() + 'Z'
-    events = calendar.events().list(calendarId='primary', timeMin=now, maxResults=4, singleEvents=True, orderBy='startTime').execute()
+    now = datetime.datetime.utcnow()
+    time_min = now.isoformat() + 'Z'
+    time_max = (now + datetime.timedelta(days=7)).isoformat() + 'Z'
+    
+    events = calendar.events().list(
+        calendarId='primary', 
+        timeMin=time_min,
+        timeMax=time_max,
+        singleEvents=True, 
+        orderBy='startTime'
+    ).execute()
+    
     calendar_data = []
     for event in events.get('items', []):
         start = event['start'].get('dateTime', event['start'].get('date'))
-        # Basic formatting of time (e.g. 2023-10-27T09:00:00+01:00 -> 09:00)
-        time_str = start.split('T')[1][:5] if 'T' in start else start
-        calendar_data.append({"id": event['id'], "title": event['summary'], "time": time_str, "type": "personal"})
+        
+        # Parse the date/datetime
+        if 'T' in start:
+            # Has time component
+            event_dt = datetime.datetime.fromisoformat(start.replace('Z', '+00:00'))
+            time_str = event_dt.strftime('%H:%M')
+            date_str = event_dt.strftime('%Y-%m-%d')
+            day_name = event_dt.strftime('%A')
+        else:
+            # All-day event
+            event_dt = datetime.datetime.fromisoformat(start)
+            time_str = 'All day'
+            date_str = start
+            day_name = event_dt.strftime('%A')
+        
+        calendar_data.append({
+            "id": event['id'], 
+            "title": event['summary'], 
+            "time": time_str,
+            "date": date_str,
+            "day": day_name,
+            "type": "personal"
+        })
 
     return {"authenticated": True, "emails": email_data, "calendar": calendar_data}
