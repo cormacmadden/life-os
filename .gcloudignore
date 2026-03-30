@@ -1,0 +1,23 @@
+# Exclude frontend and other unnecessary directories
+frontend/
+node_modules/
+postgres_data/
+ha_config/
+venv/
+docs/
+.git/
+.next/
+out/
+
+# Exclude unnecessary files
+*.md
+*.ps1
+.env
+.env.*
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+
+# Don't exclude json files - we need credentials.json
+# *.json

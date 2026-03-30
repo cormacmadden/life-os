@@ -332,77 +332,77 @@ async def get_bus_routes():
                 
                 # Use the /bus/route endpoint with edge_geometry
                 # Format: /bus/route/{operator}/{route}/{direction}/timetable.json
-                timetable_url = f"https://transportapi.com/v3/uk/bus/route/{route_info['operator']}/{route_upper}/{route_info['direction']}/timetable.json"
-                params = {
-                    "app_id": APP_ID,
-                    "app_key": APP_KEY,
-                    "edge_geometry": "true"
-                }
+                # timetable_url = f"https://transportapi.com/v3/uk/bus/route/{route_info['operator']}/{route_upper}/{route_info['direction']}/timetable.json"
+                # params = {
+                #     "app_id": APP_ID,
+                #     "app_key": APP_KEY,
+                #     "edge_geometry": "true"
+                # }
                 
-                print(f"[DEBUG] Fetching route geometry for {route} from {timetable_url}")
-                response = await client.get(timetable_url, params=params)
-                print(f"[DEBUG] Response status: {response.status_code}")
+                # print(f"[DEBUG] Fetching route geometry for {route} from {timetable_url}")
+                # response = await client.get(timetable_url, params=params)
+                # print(f"[DEBUG] Response status: {response.status_code}")
                 
-                if response.status_code == 200:
-                    data = response.json()
-                    stops = data.get("stops", [])
-                    print(f"[DEBUG] Found {len(stops)} stops for {route}")
+                # if response.status_code == 200:
+                #     data = response.json()
+                #     stops = data.get("stops", [])
+                #     print(f"[DEBUG] Found {len(stops)} stops for {route}")
                     
-                    if stops and len(stops) > 1:
-                        # Extract geometry from stop connections
-                        # The coordinates are in stops[].next.coordinates as arrays of [lon, lat]
-                        geometries = []
-                        for stop in stops[:-1]:  # All stops except the last (which has no 'next')
-                            if "next" in stop and "coordinates" in stop["next"]:
-                                # Each stop's 'next' contains coordinates to the next stop
-                                coords = stop["next"]["coordinates"]
-                                if coords:
-                                    geometries.append({
-                                        "type": "LineString",
-                                        "coordinates": coords
-                                    })
+                #     if stops and len(stops) > 1:
+                #         # Extract geometry from stop connections
+                #         # The coordinates are in stops[].next.coordinates as arrays of [lon, lat]
+                #         geometries = []
+                #         for stop in stops[:-1]:  # All stops except the last (which has no 'next')
+                #             if "next" in stop and "coordinates" in stop["next"]:
+                #                 # Each stop's 'next' contains coordinates to the next stop
+                #                 coords = stop["next"]["coordinates"]
+                #                 if coords:
+                #                     geometries.append({
+                #                         "type": "LineString",
+                #                         "coordinates": coords
+                #                     })
                         
-                        if geometries:
-                            routes_data.append({
-                                "route": route_upper,
-                                "operator": route_info["operator"],
-                                "geometries": geometries,
-                                "description": f"{route_upper} to {stops[-1].get('name', 'Destination')}"
-                            })
-                            print(f"[DEBUG] Found {len(geometries)} geometry segments for {route}")
-                        else:
-                            print(f"[DEBUG] No geometries found in stop connections for {route}")
-                            # Use fallback
-                            if route_upper in fallback_routes:
-                                routes_data.append(fallback_routes[route_upper])
-                                print(f"[DEBUG] Using fallback route for {route}")
-                    else:
-                        print(f"[DEBUG] No stops found for route {route}")
-                        # Use fallback
-                        if route_upper in fallback_routes:
-                            routes_data.append(fallback_routes[route_upper])
-                            print(f"[DEBUG] Using fallback route for {route}")
-                elif response.status_code == 404:
-                    # Route not found - U2 might not have direction-specific service or might use different naming
-                    print(f"[DEBUG] 404 for {route} with direction {route_info['direction']}")
-                    print(f"[DEBUG] This route may not exist in TransportAPI or uses different naming")
-                    # Use hardcoded fallback immediately
-                    if route_upper in fallback_routes:
-                        routes_data.append(fallback_routes[route_upper])
-                        print(f"[DEBUG] Using hardcoded fallback route for {route}")
-                else:
-                    print(f"[DEBUG] API error {response.status_code}: {response.text[:200]}")
-                    # Use fallback for this route if API fails
-                    route_upper = route.upper()
-                    if route_upper in fallback_routes:
-                        fallback = fallback_routes[route_upper]
-                        routes_data.append({
-                            "route": fallback["route"],
-                            "operator": fallback["operator"],
-                            "coordinates": fallback["coordinates"],
-                            "source": "fallback"
-                        })
-                        print(f"[DEBUG] Using hardcoded fallback route for {route}")
+                #         if geometries:
+                #             routes_data.append({
+                #                 "route": route_upper,
+                #                 "operator": route_info["operator"],
+                #                 "geometries": geometries,
+                #                 "description": f"{route_upper} to {stops[-1].get('name', 'Destination')}"
+                #             })
+                #             print(f"[DEBUG] Found {len(geometries)} geometry segments for {route}")
+                #         else:
+                #             print(f"[DEBUG] No geometries found in stop connections for {route}")
+                #             # Use fallback
+                #             if route_upper in fallback_routes:
+                #                 routes_data.append(fallback_routes[route_upper])
+                #                 print(f"[DEBUG] Using fallback route for {route}")
+                #     else:
+                #         print(f"[DEBUG] No stops found for route {route}")
+                #         # Use fallback
+                #         if route_upper in fallback_routes:
+                #             routes_data.append(fallback_routes[route_upper])
+                #             print(f"[DEBUG] Using fallback route for {route}")
+                # elif response.status_code == 404:
+                #     # Route not found - U2 might not have direction-specific service or might use different naming
+                #     print(f"[DEBUG] 404 for {route} with direction {route_info['direction']}")
+                #     print(f"[DEBUG] This route may not exist in TransportAPI or uses different naming")
+                #     # Use hardcoded fallback immediately
+                #     if route_upper in fallback_routes:
+                #         routes_data.append(fallback_routes[route_upper])
+                #         print(f"[DEBUG] Using hardcoded fallback route for {route}")
+                # else:
+                #print(f"[DEBUG] API error {response.status_code}: {response.text[:200]}")
+                # Use fallback for this route if API fails
+                route_upper = route.upper()
+                if route_upper in fallback_routes:
+                    fallback = fallback_routes[route_upper]
+                    routes_data.append({
+                        "route": fallback["route"],
+                        "operator": fallback["operator"],
+                        "coordinates": fallback["coordinates"],
+                        "source": "fallback"
+                    })
+                    print(f"[DEBUG] Using hardcoded fallback route for {route}")
                 
             except Exception as e:
                 print(f"[DEBUG] Exception fetching route {route}: {e}")

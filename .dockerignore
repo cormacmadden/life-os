@@ -1,0 +1,23 @@
+# Ignore the .env file to prevent it from being included in Docker images
+.env
+backend/.env
+
+# Ignore Python cache files
+__pycache__/
+*.pyc
+*.pyo
+
+# Ignore logs
+*.log
+
+# Ignore local development files
+.vscode/
+*.swp
+
+# Ignore node_modules (if applicable)
+node_modules/
+
+# Ignore other sensitive or unnecessary files
+.DS_Store
+*.bak
+*.tmp

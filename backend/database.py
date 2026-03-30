@@ -12,7 +12,8 @@ load_dotenv(os.path.join(current_dir, '.env'))
 # -------------------------
 
 # --- 2. GET DATABASE URL ---
-DATABASE_URL = os.getenv("DATABASE_URL")
+# Provide a default value for DATABASE_URL if not set
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./lifeos_data.db")
 
 if not DATABASE_URL:
     raise ValueError("DATABASE_URL not found in .env file.")
@@ -35,4 +36,12 @@ async_session_maker = sessionmaker(
 # --- 5. SESSION DEPENDENCY ---
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     async with async_session_maker() as session:
+        yield session
+
+# --- 6. SYNC SESSION for OAuth callbacks (non-async) ---
+from sqlmodel import Session, create_engine
+sync_engine = create_engine("sqlite:///./backend/life_os.db", echo=False, connect_args={"check_same_thread": False})
+
+def get_sync_session():
+    with Session(sync_engine) as session:
         yield session

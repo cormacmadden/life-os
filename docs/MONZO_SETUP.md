@@ -39,7 +39,7 @@ If you want to test the integration quickly without setting up OAuth:
 4. **Restart the backend**:
    ```bash
    # The backend should auto-reload, but if not:
-   Ctrl+C and restart: uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+   Ctrl+C and restart: uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080
    ```
 
 5. **Refresh your dashboard** - the Monzo widget should now show your data!
@@ -60,7 +60,7 @@ For automatic token refresh without expiration:
    - **Name**: LifeOS Dashboard (or any name you prefer)
    - **Logo URL**: (optional)
    - **Redirect URLs**: Add your callback URL:
-     - For local development: `http://localhost:8000/api/monzo/callback`
+     - For local development: `http://localhost:8080/api/monzo/callback`
      - For remote access: `https://your-backend-url/api/monzo/callback`
    - **Description**: Personal finance dashboard integration
    - **Confidentiality**: Confidential
@@ -78,7 +78,7 @@ Add your Monzo credentials to the backend `.env` file:
 # Monzo API Configuration
 MONZO_CLIENT_ID=your_client_id_here
 MONZO_CLIENT_SECRET=your_client_secret_here
-MONZO_REDIRECT_URI=http://localhost:8000/api/monzo/callback
+MONZO_REDIRECT_URI=http://localhost:8080/api/monzo/callback
 ```
 
 **Important**: Update `MONZO_REDIRECT_URI` to match your actual backend URL, especially if using Cloudflare Tunnel or other remote access methods.
@@ -89,7 +89,7 @@ After adding the environment variables, restart your FastAPI backend:
 
 ```bash
 cd backend
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
+uvicorn main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 ### 4. Connect Your Account

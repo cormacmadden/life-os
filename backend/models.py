@@ -6,8 +6,29 @@ class User(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)
+    google_id: Optional[str] = Field(default=None, unique=True, index=True)
+    name: Optional[str] = None
+    picture: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    last_login: Optional[datetime] = None
     plants: List["Plant"] = Relationship(back_populates="owner")
     cars: List["Car"] = Relationship(back_populates="owner")
+    tokens: List["UserToken"] = Relationship(back_populates="user")
+
+class UserToken(SQLModel, table=True):
+    """Store OAuth tokens for each user and service"""
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(foreign_key="user.id")
+    service: str = Field(index=True)  # "google", "spotify", "monzo"
+    access_token: str
+    refresh_token: Optional[str] = None
+    token_type: Optional[str] = None
+    expires_at: Optional[datetime] = None
+    scope: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    user: Optional[User] = Relationship(back_populates="tokens")
 
 class Plant(SQLModel, table=True):
     __table_args__ = {"extend_existing": True}

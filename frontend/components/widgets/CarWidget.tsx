@@ -62,6 +62,7 @@ export const CarWidget: React.FC<CarWidgetProps> = ({ apiUrl }) => {
     oil_change_interval_miles: 5000,
     service_interval_miles: 10000,
   });
+  
   const [newRecord, setNewRecord] = useState<Partial<MaintenanceRecord>>({
     type: 'oil_change',
     maintenance_date: new Date().toISOString().split('T')[0],

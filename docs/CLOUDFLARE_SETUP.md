@@ -5,7 +5,7 @@ This guide will help you set up Cloudflare Tunnel to access your Life OS dashboa
 ## Overview
 
 With this setup:
-- **At home**: App automatically uses your local IP (192.168.4.28:8000) - FAST ⚡
+- **At home**: App automatically uses your local IP (192.168.4.28:8080) - FAST ⚡
 - **Remote (work, etc.)**: App uses Cloudflare Tunnel URL - works anywhere 🌐
 - **No installation needed**: Just open a browser
 
@@ -67,7 +67,7 @@ ingress:
   
   # Backend (FastAPI)  
   - hostname: lifeos-api.trycloudflare.com
-    service: http://localhost:8000
+    service: http://localhost:8080
   
   # Catch-all rule (required)
   - service: http_status:404
@@ -169,7 +169,7 @@ SPOTIFY_REDIRECT_URI=https://lifeos-api.trycloudflare.com/api/spotify/callback
    ```powershell
    cd d:\Personal\Coding\life-os
    .\venv\Scripts\activate
-   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080
    ```
 
 2. **Start your frontend**:
@@ -194,7 +194,7 @@ SPOTIFY_REDIRECT_URI=https://lifeos-api.trycloudflare.com/api/spotify/callback
 ## Troubleshooting
 
 ### "Connection refused" error
-- Make sure backend is running on port 8000
+- Make sure backend is running on port 8080
 - Check Windows Firewall isn't blocking the ports
 - Verify `--host 0.0.0.0` is used when starting uvicorn
 
@@ -216,7 +216,7 @@ cloudflared tunnel run lifeos --loglevel debug
 ```
 
 ### App always uses remote URL at home
-- Check that `192.168.4.28:8000` is accessible in your browser
+- Check that `192.168.4.28:8080` is accessible in your browser
 - Open browser dev tools and check console for detection messages
 - Try resetting detection by refreshing the page
 
@@ -269,7 +269,7 @@ For quick testing without full setup:
 
 ```powershell
 # Backend tunnel (temporary URL)
-cloudflared tunnel --url http://localhost:8000
+cloudflared tunnel --url http://localhost:8080
 
 # Frontend tunnel (temporary URL)  
 cloudflared tunnel --url http://localhost:3000

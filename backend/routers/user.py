@@ -1,14 +1,33 @@
-from fastapi import APIRouter, HTTPException
-from sqlmodel import select
+from fastapi import APIRouter, HTTPException, Depends
+from sqlmodel import select, Session
 from sqlmodel.ext.asyncio.session import AsyncSession
-from ..database import engine
-from ..models import UserConfig
+from backend.database import engine, get_session
+from backend.models import UserConfig, User
+from backend.auth import get_current_user, require_user
 from pydantic import BaseModel
 from typing import Optional
 import httpx
 import os
 
 router = APIRouter()
+
+@router.get("/me")
+async def get_current_user_info(user: User = Depends(require_user)):
+    """Get current logged-in user information."""
+    return {
+        "id": user.id,
+        "email": user.email,
+        "name": user.name,
+        "picture": user.picture,
+        "google_id": user.google_id,
+        "created_at": user.created_at.isoformat() if user.created_at else None,
+        "last_login": user.last_login.isoformat() if user.last_login else None
+    }
+
+@router.get("/logout")
+async def logout():
+    """Logout endpoint (client should clear cookies)."""
+    return {"message": "Logged out successfully"}
 
 async def geocode_with_nominatim(address: str) -> tuple[Optional[float], Optional[float]]:
     """Geocode using OpenStreetMap Nominatim (free, no API key required)."""
@@ -154,13 +173,15 @@ class UserConfigUpdate(BaseModel):
     work_longitude: Optional[float] = None
 
 @router.get("/config")
-async def get_user_config():
+async def get_user_config(
+    user: User = Depends(require_user),
+    session: AsyncSession = Depends(get_session)
+):
     """Get user configuration"""
-    async with AsyncSession(engine) as session:
-        result = await session.execute(
-            select(UserConfig).where(UserConfig.user_id == 1)
-        )
-        config = result.scalar_one_or_none()
+    result = await session.execute(
+        select(UserConfig).where(UserConfig.user_id == user.id)
+    )
+    config = result.scalar_one_or_none()
         
         if not config:
             # Return default empty config
@@ -189,15 +210,18 @@ async def get_user_config():
         }
 
 @router.put("/config")
-async def update_user_config(config_data: UserConfigUpdate):
+async def update_user_config(
+    config_data: UserConfigUpdate,
+    user: User = Depends(require_user),
+    session: AsyncSession = Depends(get_session)
+):
     """Update user configuration with automatic geocoding of addresses"""
     try:
-        async with AsyncSession(engine, expire_on_commit=False) as session:
-            # Query for existing config
-            result = await session.execute(
-                select(UserConfig).where(UserConfig.user_id == 1)
-            )
-            config = result.scalar_one_or_none()
+        # Query for existing config
+        result = await session.execute(
+            select(UserConfig).where(UserConfig.user_id == user.id)
+        )
+        config = result.scalar_one_or_none()
             
             # Geocode addresses if provided (with timeout protection)
             home_lat, home_lng = None, None
@@ -223,7 +247,7 @@ async def update_user_config(config_data: UserConfigUpdate):
             if not config:
                 # Create new config
                 config = UserConfig(
-                    user_id=1,
+                    user_id=user.id,
                     morning_bus_stops=config_data.morning_bus_stops,
                     evening_bus_stops=config_data.evening_bus_stops,
                     relevant_routes=config_data.relevant_routes,

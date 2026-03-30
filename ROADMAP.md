@@ -94,7 +94,7 @@ GET /api/dart/station/{code}    # Get specific station details
 ```
 NOTION_CLIENT_ID=your_client_id
 NOTION_CLIENT_SECRET=your_client_secret
-NOTION_REDIRECT_URI=http://localhost:8000/api/notion/callback
+NOTION_REDIRECT_URI=http://localhost:8080/api/notion/callback
 ```
 
 #### 6. Messenger & Instagram Messages

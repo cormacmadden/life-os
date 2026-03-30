@@ -45,7 +45,9 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
     if (typeof window === 'undefined' || !apiUrl) return;
     
     try {
-      const response = await fetch(`${apiUrl}/api/spotify/current-track`);
+      const response = await fetch(`${apiUrl}/api/spotify/current-track`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       setSpotifyData(data);
       if (data.volume_percent !== undefined) {
@@ -62,7 +64,9 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
     if (typeof window === 'undefined') return;
     
     try {
-      const response = await fetch(`${apiUrl}/api/spotify/queue`);
+      const response = await fetch(`${apiUrl}/api/spotify/queue`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       setQueue(data.queue || []);
     } catch (err) {
@@ -74,7 +78,8 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
     setVolume(newVolume);
     try {
       await fetch(`${apiUrl}/api/spotify/volume?volume_percent=${newVolume}`, { 
-        method: 'POST' 
+        method: 'POST',
+        credentials: 'include'
       });
     } catch (err) {
       console.error('Failed to set volume:', err);
@@ -92,7 +97,8 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
     
     try {
       await fetch(`${apiUrl}/api/spotify/seek?position_ms=${positionMs}`, { 
-        method: 'POST' 
+        method: 'POST',
+        credentials: 'include'
       });
       // Refresh track info immediately
       setTimeout(fetchCurrentTrack, 300);
@@ -117,7 +123,10 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
   const handlePlayPause = async () => {
     try {
       const endpoint = spotifyData.playing ? 'pause' : 'play';
-      await fetch(`${apiUrl}/api/spotify/${endpoint}`, { method: 'POST' });
+      await fetch(`${apiUrl}/api/spotify/${endpoint}`, { 
+        method: 'POST',
+        credentials: 'include'
+      });
       // Refresh immediately
       setTimeout(fetchCurrentTrack, 500);
     } catch (err) {
@@ -127,7 +136,10 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
 
   const handleNext = async () => {
     try {
-      await fetch(`${apiUrl}/api/spotify/next`, { method: 'POST' });
+      await fetch(`${apiUrl}/api/spotify/next`, { 
+        method: 'POST',
+        credentials: 'include'
+      });
       setTimeout(fetchCurrentTrack, 500);
     } catch (err) {
       console.error('Failed to skip track:', err);
@@ -136,7 +148,10 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
 
   const handlePrevious = async () => {
     try {
-      await fetch(`${apiUrl}/api/spotify/previous`, { method: 'POST' });
+      await fetch(`${apiUrl}/api/spotify/previous`, { 
+        method: 'POST',
+        credentials: 'include'
+      });
       setTimeout(fetchCurrentTrack, 500);
     } catch (err) {
       console.error('Failed to go to previous track:', err);
@@ -145,7 +160,9 @@ export const SpotifyWidget: React.FC<SpotifyWidgetProps> = ({ apiUrl }) => {
 
   const initiateAuth = async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/spotify/auth`);
+      const response = await fetch(`${apiUrl}/api/spotify/auth`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       if (data.auth_url) {
         window.location.href = data.auth_url;

@@ -67,7 +67,7 @@ credentials-file: $cloudflaredPath\$tunnelId.json
 ingress:
   # Backend API
   - hostname: lifeos-api.trycloudflare.com
-    service: http://localhost:8000
+    service: http://localhost:8080
   
   # Frontend App
   - hostname: lifeos-app.trycloudflare.com
@@ -110,7 +110,7 @@ Write-Host "Next Steps:" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "1. Start your backend:" -ForegroundColor White
 Write-Host "   .\venv\Scripts\activate" -ForegroundColor Gray
-Write-Host "   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000" -ForegroundColor Gray
+Write-Host "   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080" -ForegroundColor Gray
 Write-Host ""
 Write-Host "2. Start your frontend:" -ForegroundColor White
 Write-Host "   cd frontend" -ForegroundColor Gray
@@ -124,7 +124,7 @@ Write-Host "   Spotify: https://lifeos-api.trycloudflare.com/api/spotify/callbac
 Write-Host "   Google:  https://lifeos-api.trycloudflare.com/api/google/callback" -ForegroundColor Gray
 Write-Host ""
 Write-Host "5. Access your app:" -ForegroundColor White
-Write-Host "   Local:  http://192.168.4.28:3000" -ForegroundColor Gray
+Write-Host "   Local:  http://localhost:3000" -ForegroundColor Gray
 Write-Host "   Remote: https://lifeos-app.trycloudflare.com" -ForegroundColor Gray
 Write-Host ""
 Write-Host "To install as a Windows service (auto-start on boot):" -ForegroundColor Yellow

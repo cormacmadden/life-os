@@ -1,11 +1,15 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import RedirectResponse
 import os
-from google.auth.transport.requests import Request
+from google.auth.transport.requests import Request as GoogleRequest
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
 import datetime
+from sqlmodel import Session, select
+from backend.database import get_session, get_sync_session
+from backend.models import User, UserToken
+from backend.auth import get_current_user, require_user, create_access_token, set_auth_cookie
 
 router = APIRouter()
 
@@ -16,50 +20,202 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(CURRENT_DIR)
 
 # Now construct absolute paths to your sensitive files
-CREDENTIALS_FILE = os.path.join(BACKEND_DIR, 'credentials.json')
-TOKEN_FILE = os.path.join(BACKEND_DIR, 'token.json')
+import dotenv
+# Load .env but don't override existing environment variables (from Cloud Run)
+dotenv.load_dotenv(os.path.join(BACKEND_DIR, '.env'), override=False)
+CREDENTIALS_FILE = os.getenv('GOOGLE_CREDENTIALS_FILE', os.path.join(BACKEND_DIR, 'credentials.json'))
+TOKEN_FILE = os.getenv('GOOGLE_TOKEN_FILE', os.path.join(BACKEND_DIR, 'token.json'))
+
+def get_redirect_uri() -> str:
+    """Get redirect URI from environment, prioritizing Cloud Run env vars over .env file"""
+    return os.getenv('GOOGLE_REDIRECT_URI', 'https://life-os-dashboard.com/api/google/callback')
+
+def get_post_login_redirect() -> str:
+    """Get post-login redirect URL from environment"""
+    return os.getenv('GOOGLE_POST_LOGIN_REDIRECT', 'https://life-os-dashboard.com')
 
 SCOPES = [
+    'openid',
+    'https://www.googleapis.com/auth/userinfo.email',
+    'https://www.googleapis.com/auth/userinfo.profile',
     'https://www.googleapis.com/auth/gmail.readonly',
     'https://www.googleapis.com/auth/calendar.events.readonly'
 ]
 # ---------------------
 @router.get("/login")
 async def google_login():
-    flow = InstalledAppFlow.from_client_secrets_file(
-        CREDENTIALS_FILE, SCOPES,
-        redirect_uri='http://127.0.0.1:8000/api/google/callback'
+    """Initiate Google OAuth flow"""
+    redirect_uri = get_redirect_uri()
+    print(f"🔵 REDIRECT_URI from function: {redirect_uri}")
+    print(f"🔵 ENV GOOGLE_REDIRECT_URI: {os.getenv('GOOGLE_REDIRECT_URI')}")
+    print(f"🔵 All env vars with GOOGLE: {[k for k in os.environ.keys() if 'GOOGLE' in k]}")
+    
+    if not os.path.exists(CREDENTIALS_FILE):
+        return {
+            "error": "Google OAuth not configured",
+            "message": f"credentials.json not found at {CREDENTIALS_FILE}. Please configure Google OAuth credentials."
+        }
+    
+    flow = Flow.from_client_secrets_file(
+        CREDENTIALS_FILE, 
+        scopes=SCOPES,
+        redirect_uri=redirect_uri
     )
-    auth_url, _ = flow.authorization_url(prompt='consent')
+    auth_url, state = flow.authorization_url(
+        prompt='consent',
+        access_type='offline',
+        include_granted_scopes='true'
+    )
     return {"auth_url": auth_url}
 
 @router.get("/callback")
-async def google_callback(code: str):
-    flow = InstalledAppFlow.from_client_secrets_file(
-        CREDENTIALS_FILE, SCOPES,
-        redirect_uri='http://127.0.0.1:8000/api/google/callback'
+async def google_callback(
+    code: str, 
+    response: Response,
+    session: Session = Depends(get_sync_session)
+):
+    """Handle Google OAuth callback and create/login user"""
+    try:
+        print(f"🔵 Callback received with code: {code[:20]}...")
+        redirect_uri = get_redirect_uri()
+        flow = Flow.from_client_secrets_file(
+            CREDENTIALS_FILE,
+            scopes=SCOPES,
+            redirect_uri=redirect_uri
+        )
+        # Suppress scope mismatch warnings
+        import warnings
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            flow.fetch_token(code=code)
+        creds = flow.credentials
+        print(f"🔵 Token fetched successfully")
+        print(f"🔵 Token: {creds.token[:20]}...")
+        
+        # Get user info from Google using the credentials
+        user_info_service = build('oauth2', 'v2', credentials=creds, static_discovery=False)
+        user_info = user_info_service.userinfo().get().execute()
+        print(f"🔵 User info: {user_info.get('email')}")
+    except Exception as e:
+        print(f"❌ ERROR in callback: {e}")
+        import traceback
+        traceback.print_exc()
+        raise
+    
+    google_id = user_info['id']
+    email = user_info['email']
+    name = user_info.get('name')
+    picture = user_info.get('picture')
+    
+    # Find or create user
+    statement = select(User).where(User.google_id == google_id)
+    existing_user = session.exec(statement).first()
+    
+    if existing_user:
+        print(f"🔵 Found existing user: {existing_user.email}")
+        user = existing_user
+        user.email = email  # Update in case it changed
+        user.name = name
+        user.picture = picture
+        user.last_login = datetime.datetime.utcnow()
+    else:
+        # Create new user
+        print(f"🔵 Creating new user: {email}")
+        user = User(
+            email=email,
+            google_id=google_id,
+            name=name,
+            picture=picture,
+            last_login=datetime.datetime.utcnow()
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        print(f"🔵 User created with ID: {user.id}")
+    
+    # Store Google tokens
+    token_statement = select(UserToken).where(
+        UserToken.user_id == user.id,
+        UserToken.service == "google"
     )
-    flow.fetch_token(code=code)
-    with open(TOKEN_FILE, 'w') as token:
-        token.write(flow.credentials.to_json())
-    return RedirectResponse("http://localhost:3000")
+    existing_token = session.exec(token_statement).first()
+    
+    expires_at = None
+    if creds.expiry:
+        expires_at = creds.expiry
+    
+    if existing_token:
+        existing_token.access_token = creds.token
+        existing_token.refresh_token = creds.refresh_token
+        existing_token.expires_at = expires_at
+        existing_token.updated_at = datetime.datetime.utcnow()
+    else:
+        user_token = UserToken(
+            user_id=user.id,
+            service="google",
+            access_token=creds.token,
+            refresh_token=creds.refresh_token,
+            token_type=creds.token_uri,
+            expires_at=expires_at,
+            scope=" ".join(SCOPES)
+        )
+        session.add(user_token)
+    
+    session.commit()
+    
+    # Create JWT token for our app
+    access_token = create_access_token(user.id, user.email)
+    
+    # Set cookie and redirect
+    redirect_response = RedirectResponse(
+        os.getenv('GOOGLE_POST_LOGIN_REDIRECT', 'https://life-os-dashboard.com')
+    )
+    set_auth_cookie(redirect_response, access_token)
+    
+    return redirect_response
 
-async def get_creds():
-    creds = None
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            return None
+async def get_user_google_creds(user: User, session: Session):
+    """Get Google credentials for a specific user"""
+    statement = select(UserToken).where(
+        UserToken.user_id == user.id,
+        UserToken.service == "google"
+    )
+    token = session.exec(statement).first()
+    
+    if not token:
+        return None
+    
+    creds = Credentials(
+        token=token.access_token,
+        refresh_token=token.refresh_token,
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=None,  # Not needed for API calls
+        client_secret=None,  # Not needed for API calls
+        scopes=token.scope.split(" ") if token.scope else SCOPES
+    )
+    
+    # Refresh if expired
+    if creds.expired and creds.refresh_token:
+        creds.refresh(GoogleRequest())
+        # Update stored token
+        token.access_token = creds.token
+        if creds.expiry:
+            token.expires_at = creds.expiry
+        token.updated_at = datetime.datetime.utcnow()
+        session.add(token)
+        session.commit()
+    
     return creds
 
 @router.get("/data")
-async def get_google_data():
-    creds = await get_creds()
+async def get_google_data(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session)
+):
+    """Get user's Gmail and Calendar data"""
+    creds = await get_user_google_creds(user, session)
     if not creds:
-        return {"authenticated": False}
+        return {"authenticated": False, "error": "Google account not connected"}
 
     # 1. GMAIL
     gmail = build('gmail', 'v1', credentials=creds)

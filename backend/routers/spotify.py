@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends, Response
 from fastapi.responses import RedirectResponse
 import httpx
 import os
@@ -6,6 +6,10 @@ from dotenv import load_dotenv
 import base64
 from datetime import datetime, timedelta
 from typing import Optional
+from sqlmodel import Session, select
+from backend.database import get_session
+from backend.models import User, UserToken
+from backend.auth import get_current_user, require_user
 
 router = APIRouter()
 
@@ -17,43 +21,15 @@ load_dotenv(ENV_PATH)
 
 SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
-SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8000/api/spotify/callback")
+SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8080/api/spotify/callback")
 
-# Token storage file
-TOKEN_FILE = os.path.join(BACKEND_DIR, "spotify_tokens.json")
-
-def load_tokens():
-    """Load tokens from file."""
-    if os.path.exists(TOKEN_FILE):
-        try:
-            import json
-            with open(TOKEN_FILE, 'r') as f:
-                data = json.load(f)
-                if data.get("expires_at"):
-                    data["expires_at"] = datetime.fromisoformat(data["expires_at"])
-                return data
-        except Exception as e:
-            print(f"Error loading tokens: {e}")
-    return {
-        "access_token": None,
-        "refresh_token": None,
-        "expires_at": None
-    }
-
-def save_tokens():
-    """Save tokens to file."""
-    try:
-        import json
-        data = spotify_tokens.copy()
-        if data.get("expires_at"):
-            data["expires_at"] = data["expires_at"].isoformat()
-        with open(TOKEN_FILE, 'w') as f:
-            json.dump(data, f)
-    except Exception as e:
-        print(f"Error saving tokens: {e}")
-
-# Token storage (persisted to file)
-spotify_tokens = load_tokens()
+def get_user_spotify_token(user: User, session: Session) -> Optional[UserToken]:
+    """Get Spotify token for a specific user from database."""
+    statement = select(UserToken).where(
+        UserToken.user_id == user.id,
+        UserToken.service == "spotify"
+    )
+    return session.exec(statement).first()
 
 def get_auth_header() -> str:
     """Generate Basic Auth header for Spotify API."""
@@ -62,9 +38,10 @@ def get_auth_header() -> str:
     auth_base64 = base64.b64encode(auth_bytes).decode("utf-8")
     return f"Basic {auth_base64}"
 
-async def refresh_access_token() -> bool:
+async def refresh_spotify_token(user: User, session: Session) -> bool:
     """Refresh the Spotify access token using the refresh token."""
-    if not spotify_tokens["refresh_token"]:
+    token = get_user_spotify_token(user, session)
+    if not token or not token.refresh_token:
         return False
     
     async with httpx.AsyncClient() as client:
@@ -77,33 +54,37 @@ async def refresh_access_token() -> bool:
                 },
                 data={
                     "grant_type": "refresh_token",
-                    "refresh_token": spotify_tokens["refresh_token"]
+                    "refresh_token": token.refresh_token
                 }
             )
             
             if response.status_code == 200:
                 data = response.json()
-                spotify_tokens["access_token"] = data["access_token"]
-                spotify_tokens["expires_at"] = datetime.now() + timedelta(seconds=data["expires_in"])
-                save_tokens()
+                token.access_token = data["access_token"]
+                token.expires_at = datetime.now() + timedelta(seconds=data["expires_in"])
+                token.updated_at = datetime.now()
+                session.add(token)
+                session.commit()
                 return True
         except Exception as e:
             print(f"Error refreshing Spotify token: {e}")
     
     return False
 
-async def get_valid_token() -> Optional[str]:
+async def get_valid_spotify_token(user: User, session: Session) -> Optional[str]:
     """Get a valid access token, refreshing if necessary."""
-    if not spotify_tokens["access_token"]:
+    token = get_user_spotify_token(user, session)
+    if not token or not token.access_token:
         return None
     
     # Check if token is expired or about to expire
-    if spotify_tokens["expires_at"] and datetime.now() >= spotify_tokens["expires_at"] - timedelta(minutes=5):
-        if await refresh_access_token():
-            return spotify_tokens["access_token"]
+    if token.expires_at and datetime.now() >= token.expires_at - timedelta(minutes=5):
+        if await refresh_spotify_token(user, session):
+            token = get_user_spotify_token(user, session)
+            return token.access_token if token else None
         return None
     
-    return spotify_tokens["access_token"]
+    return token.access_token
 
 @router.get("/auth")
 async def spotify_auth():
@@ -123,7 +104,11 @@ async def spotify_auth():
     return {"auth_url": auth_url}
 
 @router.get("/callback")
-async def spotify_callback(code: str):
+async def spotify_callback(
+    code: str,
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session)
+):
     """Handle Spotify OAuth callback."""
     if not code:
         raise HTTPException(status_code=400, detail="No authorization code provided")
@@ -145,14 +130,31 @@ async def spotify_callback(code: str):
             
             if response.status_code == 200:
                 data = response.json()
-                spotify_tokens["access_token"] = data["access_token"]
-                spotify_tokens["refresh_token"] = data["refresh_token"]
-                spotify_tokens["expires_at"] = datetime.now() + timedelta(seconds=data["expires_in"])
-                save_tokens()
-                print(f"Tokens saved successfully")
+                
+                # Find or create Spotify token for user
+                existing_token = get_user_spotify_token(user, session)
+                
+                if existing_token:
+                    existing_token.access_token = data["access_token"]
+                    existing_token.refresh_token = data["refresh_token"]
+                    existing_token.expires_at = datetime.now() + timedelta(seconds=data["expires_in"])
+                    existing_token.updated_at = datetime.now()
+                else:
+                    new_token = UserToken(
+                        user_id=user.id,
+                        service="spotify",
+                        access_token=data["access_token"],
+                        refresh_token=data["refresh_token"],
+                        expires_at=datetime.now() + timedelta(seconds=data["expires_in"])
+                    )
+                    session.add(new_token)
+                
+                session.commit()
+                print(f"Spotify tokens saved for user {user.email}")
                 
                 # Redirect to frontend
-                return RedirectResponse(url="http://localhost:3000?spotify=connected")
+                frontend_url = os.getenv('FRONTEND_URL', 'https://life-os-dashboard.com')
+                return RedirectResponse(url=f"{frontend_url}?spotify=connected")
             else:
                 raise HTTPException(status_code=response.status_code, detail="Failed to get access token")
                 
@@ -160,24 +162,39 @@ async def spotify_callback(code: str):
             raise HTTPException(status_code=500, detail=f"Error during callback: {str(e)}")
 
 @router.get("/token-status")
-async def token_status():
+async def token_status(
+    user: User = Depends(require_user),
+    session: Session = Depends(get_session)
+):
     """Debug endpoint to check token status."""
+    token = get_user_spotify_token(user, session)
     return {
-        "has_access_token": bool(spotify_tokens["access_token"]),
-        "has_refresh_token": bool(spotify_tokens["refresh_token"]),
-        "expires_at": spotify_tokens["expires_at"].isoformat() if spotify_tokens["expires_at"] else None
+        "has_access_token": bool(token and token.access_token),
+        "has_refresh_token": bool(token and token.refresh_token),
+        "expires_at": token.expires_at.isoformat() if token and token.expires_at else None,
+        "user_email": user.email
     }
 
 @router.get("/current-track")
-async def get_current_track():
+async def get_current_track(
+    user: Optional[User] = Depends(get_current_user),
+    session: Session = Depends(get_session)
+):
     """Get currently playing track."""
-    token = await get_valid_token()
-    
-    if not token:
-        # print("No valid token found")  # Commented to reduce log noise
+    if not user:
         return {
             "authenticated": False,
-            "playing": False
+            "playing": False,
+            "message": "Please log in to see Spotify data"
+        }
+    
+    token = await get_valid_spotify_token(user, session)
+    
+    if not token:
+        return {
+            "authenticated": False,
+            "playing": False,
+            "message": "Please connect your Spotify account"
         }
     
     async with httpx.AsyncClient() as client:
@@ -303,9 +320,9 @@ async def get_current_track():
             }
 
 @router.post("/play")
-async def play_music():
+async def play_music(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Resume playback."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated with Spotify")
@@ -326,9 +343,9 @@ async def play_music():
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/pause")
-async def pause_music():
+async def pause_music(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Pause playback."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated with Spotify")
@@ -349,9 +366,9 @@ async def pause_music():
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/next")
-async def next_track():
+async def next_track(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Skip to next track."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated with Spotify")
@@ -372,9 +389,9 @@ async def next_track():
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/previous")
-async def previous_track():
+async def previous_track(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Skip to previous track."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated with Spotify")
@@ -395,18 +412,19 @@ async def previous_track():
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/status")
-async def get_status():
+async def get_status(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Check authentication status."""
-    token = await get_valid_token()
+    token_obj = get_user_spotify_token(user, session)
     return {
-        "authenticated": token is not None,
-        "has_refresh_token": spotify_tokens["refresh_token"] is not None
+        "authenticated": token_obj is not None and token_obj.access_token is not None,
+        "has_refresh_token": token_obj is not None and token_obj.refresh_token is not None,
+        "user_email": user.email
     }
 
 @router.post("/volume")
-async def set_volume(volume_percent: int):
+async def set_volume(volume_percent: int, user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Set playback volume (0-100)."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -429,9 +447,9 @@ async def set_volume(volume_percent: int):
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/seek")
-async def seek_to_position(position_ms: int):
+async def seek_to_position(position_ms: int, user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Seek to a specific position in the current track."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -454,9 +472,9 @@ async def seek_to_position(position_ms: int):
             raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/queue")
-async def get_queue():
+async def get_queue(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Get the current playback queue."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
@@ -502,7 +520,7 @@ async def get_queue():
 @router.get("/context/{context_type}/{context_id}")
 async def get_context_info(context_type: str, context_id: str):
     """Get information about the current playback context (playlist, album, etc.)."""
-    token = await get_valid_token()
+    token = await get_valid_spotify_token(user, session)
     
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")

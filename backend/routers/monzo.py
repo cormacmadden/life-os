@@ -10,7 +10,7 @@ router = APIRouter()
 # Monzo OAuth credentials
 MONZO_CLIENT_ID = os.getenv("MONZO_CLIENT_ID")
 MONZO_CLIENT_SECRET = os.getenv("MONZO_CLIENT_SECRET")
-REDIRECT_URI = os.getenv("MONZO_REDIRECT_URI", "http://localhost:8000/api/monzo/callback")
+REDIRECT_URI = os.getenv("MONZO_REDIRECT_URI", "http://localhost:8080/api/monzo/callback")
 
 # Token storage file
 TOKEN_FILE = "monzo_tokens.json"
@@ -102,13 +102,12 @@ async def monzo_callback(code: str, state: str):
                 }
             )
             
-            print(f"Token exchange response status: {response.status_code}")
-            print(f"Token exchange response: {response.text}")
+            # Removed sensitive logging that could expose tokens
             
             if response.status_code != 200:
                 raise HTTPException(
                     status_code=response.status_code,
-                    detail=f"Failed to get access token: {response.text}"
+                    detail="Failed to get access token from Monzo API"
                 )
             
             token_data = response.json()

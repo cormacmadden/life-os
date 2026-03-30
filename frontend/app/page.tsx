@@ -36,6 +36,7 @@ import {
 import { THEME } from '@/lib/theme';
 import { BusData, HomeState, Plant, CalendarEvent, Email, GoogleData, FinanceEntry, SpotifyState, ChatMessage, IdentityState} from '@/lib/types';
 import { Card, CardHeader, CardContent } from '@/components/Card';
+import GoogleWidget from '@/components/widgets/GoogleWidget';
 
 // Loading component for lazy-loaded widgets
 const WidgetLoading = ({ title, icon: Icon }: { title: string; icon: LucideIcon }) => (
@@ -184,9 +185,9 @@ export default function App() {
     }
   }, [widgetVisibility]);
 
-  // API URL with fallback to Cloudflare
-  const LOCAL_API = "http://192.168.4.28:8000";
-  const REMOTE_API = process.env.NEXT_PUBLIC_CLOUDFLARE_URL || "https://life-os-dashboard.com";
+  // API URL - tries local first, falls back to production
+  const LOCAL_API = process.env.NEXT_PUBLIC_LOCAL_BACKEND_URL || "http://localhost:8080";
+  const REMOTE_API = process.env.NEXT_PUBLIC_PROD_BACKEND_URL || "http://localhost:8080";
   const [API_BASE_URL, setApiBaseUrl] = useState<string>(LOCAL_API);
 
   // DATA STATES
@@ -228,43 +229,50 @@ export default function App() {
   useEffect(() => {
     setIsClient(true);
     
-    // Set local API immediately and check in background
-    console.log('🔍 Trying local API first:', LOCAL_API);
-    setApiBaseUrl(LOCAL_API);
+    // In production build, use remote API. In dev, try local first.
+    const isProd = process.env.NODE_ENV === 'production';
     
-    // Quick background check - if local fails, switch to remote
-    const verifyApiUrl = async () => {
-      const startTime = Date.now();
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 200); // 10 seconds
-        
-        console.log('⏱️ Starting API health check...');
-        const response = await fetch(`${LOCAL_API}/health`, {
-          method: 'GET',
-          signal: controller.signal,
-          cache: 'no-store',
-        });
-        
-        clearTimeout(timeoutId);
-        const elapsed = Date.now() - startTime;
-        
-        if (response.ok) {
-          console.log(`✅ Local API confirmed working (${elapsed}ms)`);
-        } else {
-          console.log(`⚠️ Local API returned ${response.status}, switching to remote`);
+    if (isProd) {
+      console.log('🌐 Production mode: Using remote API:', REMOTE_API);
+      setApiBaseUrl(REMOTE_API);
+    } else {
+      console.log('🏠 Development mode: Trying local API first:', LOCAL_API);
+      setApiBaseUrl(LOCAL_API);
+      
+      // Quick background check - if local fails, switch to remote
+      const verifyApiUrl = async () => {
+        const startTime = Date.now();
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          console.log('⏱️ Starting API health check...');
+          const response = await fetch(`${LOCAL_API}/health`, {
+            method: 'GET',
+            signal: controller.signal,
+            cache: 'no-store',
+          });
+          
+          clearTimeout(timeoutId);
+          const elapsed = Date.now() - startTime;
+          
+          if (response.ok) {
+            console.log(`✅ Local API confirmed working (${elapsed}ms)`);
+          } else {
+            console.log(`⚠️ Local API returned ${response.status}, switching to remote`);
+            setApiBaseUrl(REMOTE_API);
+          }
+        } catch (error) {
+          const elapsed = Date.now() - startTime;
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          console.log(`⚠️ Local API health check failed after ${elapsed}ms:`, errorMsg);
+          console.log('🌐 Switching to remote API:', REMOTE_API);
           setApiBaseUrl(REMOTE_API);
         }
-      } catch (error) {
-        const elapsed = Date.now() - startTime;
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        console.log(`🌐 Local API failed after ${elapsed}ms:`, errorMsg);
-        console.log('Switching to remote:', REMOTE_API);
-        setApiBaseUrl(REMOTE_API);
-      }
-    };
-    
-    verifyApiUrl();
+      };
+      
+      verifyApiUrl();
+    }
   }, []);
 
   // Fetch integration statuses once API URL is detected
@@ -276,6 +284,20 @@ export default function App() {
       fetchMonzoStatus();
     }
   }, [API_BASE_URL, isClient]);
+
+  // Refresh Google data when returning from OAuth (detect by checking if we just loaded)
+  useEffect(() => {
+    if (isClient && API_BASE_URL) {
+      // Check if we just came back from OAuth callback
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.has('code') || window.location.pathname.includes('callback')) {
+        console.log('Detected OAuth callback, refreshing Google data...');
+        setTimeout(() => {
+          fetchGoogleData();
+        }, 1000); // Give backend time to save the token
+      }
+    }
+  }, [isClient, API_BASE_URL]);
 
   const fetchBusData = (forceRefresh = false) => {
     if (!isClient) return;
@@ -299,14 +321,18 @@ export default function App() {
   };
 
   const fetchGoogleData = () => {
-    fetch(`${API_BASE_URL}/api/google/data`)
+    fetch(`${API_BASE_URL}/api/google/data`, {
+      credentials: 'include'
+    })
       .then(res => res.json())
       .then(data => setGoogleData(data))
       .catch(e => console.error("Google fetch failed:", e));
   };
 
   const fetchSpotifyStatus = () => {
-    fetch(`${API_BASE_URL}/api/spotify/status`)
+    fetch(`${API_BASE_URL}/api/spotify/status`, {
+      credentials: 'include'
+    })
       .then(res => res.json())
       .then(data => {
         console.log("Spotify status:", data);
@@ -319,7 +345,9 @@ export default function App() {
   };
 
   const fetchMonzoStatus = () => {
-    fetch(`${API_BASE_URL}/api/monzo/status`)
+    fetch(`${API_BASE_URL}/api/monzo/status`, {
+      credentials: 'include'
+    })
       .then(res => res.json())
       .then(data => {
         console.log("Monzo status:", data);
@@ -335,7 +363,7 @@ export default function App() {
     fetch(`${API_BASE_URL}/api/google/login`)
         .then(res => res.json())
         .then(data => { if (data.auth_url) window.location.href = data.auth_url; });
-    alert("Uncomment handleGoogleLogin locally to test!");
+    // The alert has been removed to ensure proper functionality.
   };
 
   const handleSpotifyLogin = () => {
@@ -366,7 +394,8 @@ export default function App() {
           fetch(`${API_BASE_URL}/api/smarthome/toggle`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ device_id: device, target_state: !currentState })
+              body: JSON.stringify({ device_id: device, target_state: !currentState }),
+              credentials: 'include'
           }).then(res => {
               if (!res.ok) throw new Error(`Backend responded with ${res.status}`);
               console.log("FRONTEND DEBUG: Backend confirmed toggle.");
@@ -389,7 +418,9 @@ export default function App() {
       setConfigLoading(true);
       
       try {
-        const response = await fetch(`${API_BASE_URL}/api/user/config`);
+        const response = await fetch(`${API_BASE_URL}/api/user/config`, {
+          credentials: 'include'
+        });
         
         if (response.ok) {
           const data = await response.json();
@@ -439,7 +470,8 @@ export default function App() {
       const response = await fetch(`${API_BASE_URL}/api/user/config`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(configData)
+        body: JSON.stringify(configData),
+        credentials: 'include'
       });
       
       if (response.ok) {

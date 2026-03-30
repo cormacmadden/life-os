@@ -76,7 +76,7 @@ HA_TOKEN=your_home_assistant_token
 # --- SPOTIFY ---
 SPOTIFY_CLIENT_ID=your_spotify_client_id
 SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/api/spotify/callback
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8080/api/spotify/callback
 
 # --- GARMIN CONNECT ---
 GARMIN_EMAIL=your_email@example.com
@@ -96,7 +96,7 @@ npm install
 Update `frontend/lib/config.ts` with your backend URL if different from default:
 
 ```typescript
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080';
 ```
 
 ### 4. Run the Application
@@ -107,7 +107,7 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost
 venv\Scripts\activate  # Windows
 source venv/bin/activate  # macOS/Linux
 
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 **Terminal 2 - Frontend:**
@@ -140,7 +140,7 @@ This enables:
 
 1. Go to [Spotify Developer Dashboard](https://developer.spotify.com/dashboard)
 2. Create a new app
-3. Add redirect URI: `http://127.0.0.1:8000/api/spotify/callback`
+3. Add redirect URI: `http://127.0.0.1:8080/api/spotify/callback`
 4. Copy Client ID and Client Secret to `.env`
 5. Click "Connect Spotify" in the widget to authenticate
 
@@ -173,7 +173,7 @@ Simply add your Garmin Connect email and password to `.env`. No API keys needed!
 
 The app uses SQLite by default. To initialize the database:
 
-1. Visit `http://localhost:8000/api/init-db`
+1. Visit `http://localhost:8080/api/init-db`
 2. This creates all necessary tables
 
 ## Project Structure
@@ -227,10 +227,10 @@ Data refreshes on page load, cached for 5 minutes.
 ### Backend won't start
 - Make sure virtual environment is activated
 - Check all environment variables are set in `.env`
-- Verify port 8000 is not in use
+- Verify port 8080 is not in use
 
 ### Spotify shows "Invalid redirect URI"
-- Ensure redirect URI in Spotify Dashboard matches exactly: `http://127.0.0.1:8000/api/spotify/callback`
+- Ensure redirect URI in Spotify Dashboard matches exactly: `http://127.0.0.1:8080/api/spotify/callback`
 - Use `127.0.0.1` not `localhost`
 
 ### Garmin data shows zeros
@@ -239,7 +239,7 @@ Data refreshes on page load, cached for 5 minutes.
 - Check Garmin Connect account is accessible
 
 ### Frontend can't connect to backend
-- Check backend is running on port 8000
+- Check backend is running on port 8080
 - Update `API_BASE_URL` in frontend if needed
 - Check CORS settings in `backend/main.py`
 

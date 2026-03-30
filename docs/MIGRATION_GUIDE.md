@@ -6,7 +6,7 @@ This guide shows how to update your code to use the auto-detecting API URL syste
 
 ### Before (hardcoded URL):
 ```typescript
-const API_BASE_URL = "http://192.168.4.28:8000";
+const API_BASE_URL = "http://192.168.4.28:8080";
 
 fetch(`${API_BASE_URL}/api/bus`)
   .then(res => res.json())
@@ -80,7 +80,7 @@ const { data, loading } = useApiData<BusData>('/api/bus');
 ### Development (.env.local):
 ```env
 # Leave empty or use localhost for development
-NEXT_PUBLIC_CLOUDFLARE_URL=http://localhost:8000
+NEXT_PUBLIC_CLOUDFLARE_URL=http://localhost:8080
 ```
 
 ### Production (.env.local or .env.production):
@@ -107,9 +107,9 @@ const handleResetNetwork = () => {
 
 Search for all instances of:
 - [ ] `API_BASE_URL` - replace with `await apiUrl()`
-- [ ] Hardcoded IPs like `192.168.4.28:8000`
-- [ ] `http://127.0.0.1:8000` 
-- [ ] `http://localhost:8000`
+- [ ] Hardcoded IPs like `192.168.4.28:8080`
+- [ ] `http://127.0.0.1:8080` 
+- [ ] `http://localhost:8080`
 
 Files to update:
 - [ ] `frontend/app/page.tsx` - main dashboard
@@ -119,9 +119,9 @@ Files to update:
 ## Testing
 
 1. **Test local detection**:
-   - Ensure backend is running: `uvicorn backend.main:app --host 0.0.0.0 --port 8000`
+   - Ensure backend is running: `uvicorn backend.main:app --host 0.0.0.0 --port 8080`
    - Open frontend: `http://192.168.4.28:3000`
-   - Check console for: `✅ Using local API: http://192.168.4.28:8000`
+   - Check console for: `✅ Using local API: http://192.168.4.28:8080`
 
 2. **Test remote fallback**:
    - Stop the backend
@@ -144,8 +144,8 @@ Files to update:
 
 ### Always uses remote URL at home
 - Check backend is running with `--host 0.0.0.0`
-- Verify `192.168.4.28:8000/docs` is accessible in browser
-- Check Windows Firewall isn't blocking port 8000
+- Verify `192.168.4.28:8080/docs` is accessible in browser
+- Check Windows Firewall isn't blocking port 8080
 
 ### Detection takes too long
 - Adjust timeout in `frontend/lib/api.ts`:

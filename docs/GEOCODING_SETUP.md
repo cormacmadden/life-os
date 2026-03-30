@@ -19,10 +19,10 @@ Test if an address can be geocoded:
 
 ```bash
 # Via API (with backend running)
-curl "http://192.168.4.28:8000/api/user/geocode?address=Leamington%20Spa,%20UK"
+curl "http://192.168.4.28:8080/api/user/geocode?address=Leamington%20Spa,%20UK"
 
 # Via PowerShell
-Invoke-RestMethod -Uri "http://192.168.4.28:8000/api/user/geocode?address=Birmingham, UK"
+Invoke-RestMethod -Uri "http://192.168.4.28:8080/api/user/geocode?address=Birmingham, UK"
 
 # Via Python script
 python test_geocoding.py
@@ -107,7 +107,7 @@ For best results, format addresses like this:
 1. Check backend logs for geocoding errors
 2. Test the address with the test endpoint:
    ```bash
-   curl "http://192.168.4.28:8000/api/user/geocode?address=YOUR_ADDRESS"
+   curl "http://192.168.4.28:8080/api/user/geocode?address=YOUR_ADDRESS"
    ```
 3. Try a more specific address (add country, city, etc.)
 4. Consider adding a Google Geocoding API key for better results

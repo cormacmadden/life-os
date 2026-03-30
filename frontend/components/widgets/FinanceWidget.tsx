@@ -28,7 +28,9 @@ export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
 
   const checkMonzoStatus = async () => {
     try {
-      const response = await fetch(`${apiUrl}/api/monzo/status`);
+      const response = await fetch(`${apiUrl}/api/monzo/status`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       setConnected(data.connected);
       if (data.connected) {
@@ -43,7 +45,9 @@ export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
     setLoading(true);
     try {
       // Fetch balance chart (includes current balance)
-      const chartResponse = await fetch(`${apiUrl}/api/monzo/balance-chart`);
+      const chartResponse = await fetch(`${apiUrl}/api/monzo/balance-chart`, {
+        credentials: 'include'
+      });
       const chartData = await chartResponse.json();
       setBalance(`£${chartData.current_balance.toFixed(2)}`);
       setFinanceData(chartData.chart_data);
@@ -58,7 +62,9 @@ export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
     window.open(`${apiUrl}/api/monzo/auth`, '_blank');
     // Poll for connection status
     const pollInterval = setInterval(async () => {
-      const response = await fetch(`${apiUrl}/api/monzo/status`);
+      const response = await fetch(`${apiUrl}/api/monzo/status`, {
+        credentials: 'include'
+      });
       const data = await response.json();
       if (data.connected) {
         setConnected(true);

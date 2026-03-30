@@ -20,7 +20,7 @@ OAuth2 is the official, secure way to access Garmin Connect data.
    - **Application Name**: Life OS Dashboard
    - **Description**: Personal dashboard for tracking fitness data
    - **Application Type**: Web Application
-   - **Redirect URL**: `http://localhost:8000/api/garmin/callback` (for local testing)
+   - **Redirect URL**: `http://localhost:8080/api/garmin/callback` (for local testing)
    - **Redirect URL**: `https://api.life-os-dashboard.com/api/garmin/callback` (for production)
 
 5. Note your credentials:
@@ -47,7 +47,7 @@ Add to `backend/.env`:
 # Garmin OAuth2
 GARMIN_CLIENT_ID=your_consumer_key_here
 GARMIN_CLIENT_SECRET=your_consumer_secret_here
-GARMIN_REDIRECT_URI=http://localhost:8000/api/garmin/callback
+GARMIN_REDIRECT_URI=http://localhost:8080/api/garmin/callback
 ```
 
 ### 4. Implement OAuth2 Flow
@@ -160,7 +160,7 @@ app.include_router(garmin_oauth.router, prefix="/api/garmin", tags=["garmin"])
 
 ### 7. Authentication Flow for Users
 
-1. User visits: `http://localhost:8000/api/garmin/auth`
+1. User visits: `http://localhost:8080/api/garmin/auth`
 2. Redirected to Garmin login page
 3. User logs in and grants permissions
 4. Redirected back to `/api/garmin/callback`

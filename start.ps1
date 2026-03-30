@@ -35,46 +35,46 @@ try {
 }
 
 # Check and start Cloudflare Tunnel
-Write-Host "`n☁️  Checking Cloudflare Tunnel..." -ForegroundColor Cyan
-try {
-    # Check if cloudflared is installed
-    $cloudflaredExists = Get-Command cloudflared -ErrorAction SilentlyContinue
-    if (-not $cloudflaredExists) {
-        Write-Host "⚠️  cloudflared is not installed or not in PATH" -ForegroundColor Yellow
-    } else {
-        # Check if tunnel is already running
-        $tunnelProcess = Get-Process -Name cloudflared -ErrorAction SilentlyContinue
+# Write-Host "`n☁️  Checking Cloudflare Tunnel..." -ForegroundColor Cyan
+# try {
+#     # Check if cloudflared is installed
+#     $cloudflaredExists = Get-Command cloudflared -ErrorAction SilentlyContinue
+#     if (-not $cloudflaredExists) {
+#         Write-Host "⚠️  cloudflared is not installed or not in PATH" -ForegroundColor Yellow
+#     } else {
+#         # Check if tunnel is already running
+#         $tunnelProcess = Get-Process -Name cloudflared -ErrorAction SilentlyContinue
         
-        if ($tunnelProcess) {
-            Write-Host "✓ Cloudflare tunnel is already running" -ForegroundColor Green
-        } else {
-            Write-Host "⏳ Starting Cloudflare tunnel (lifeos2)..." -ForegroundColor Yellow
-            $tunnelJob = Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot'; cloudflared tunnel run lifeos2" -PassThru -WindowStyle Minimized
-            Start-Sleep -Seconds 3
+#         if ($tunnelProcess) {
+#             Write-Host "✓ Cloudflare tunnel is already running" -ForegroundColor Green
+#         } else {
+#             Write-Host "⏳ Starting Cloudflare tunnel (lifeos2)..." -ForegroundColor Yellow
+#             $tunnelJob = Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot'; cloudflared tunnel run lifeos2" -PassThru -WindowStyle Minimized
+#             Start-Sleep -Seconds 3
             
-            # Verify tunnel started
-            $tunnelCheck = Get-Process -Name cloudflared -ErrorAction SilentlyContinue
-            if ($tunnelCheck) {
-                Write-Host "✓ Cloudflare tunnel started successfully (PID: $($tunnelJob.Id))" -ForegroundColor Green
-            } else {
-                Write-Host "⚠️  Failed to start Cloudflare tunnel" -ForegroundColor Yellow
-            }
-        }
-    }
-} catch {
-    Write-Host "⚠️  Could not check Cloudflare tunnel status: $_" -ForegroundColor Yellow
-}
+#             # Verify tunnel started
+#             $tunnelCheck = Get-Process -Name cloudflared -ErrorAction SilentlyContinue
+#             if ($tunnelCheck) {
+#                 Write-Host "✓ Cloudflare tunnel started successfully (PID: $($tunnelJob.Id))" -ForegroundColor Green
+#             } else {
+#                 Write-Host "⚠️  Failed to start Cloudflare tunnel" -ForegroundColor Yellow
+#             }
+#         }
+#     }
+# } catch {
+#     Write-Host "⚠️  Could not check Cloudflare tunnel status: $_" -ForegroundColor Yellow
+# }
 
 # Check if ports are already in use
-$backendPort = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+$backendPort = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
 $frontendPort = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
 
 if ($backendPort) {
-    Write-Host "⚠️  Port 8000 already in use (Backend)" -ForegroundColor Yellow
+    Write-Host "⚠️  Port 8080 already in use (Backend)" -ForegroundColor Yellow
     $response = Read-Host "Kill existing process? (y/n)"
     if ($response -eq 'y') {
         Stop-Process -Id $backendPort.OwningProcess -Force
-        Write-Host "✓ Killed process on port 8000" -ForegroundColor Green
+        Write-Host "✓ Killed process on port 8080" -ForegroundColor Green
         Start-Sleep -Seconds 2
     }
 }
@@ -90,20 +90,20 @@ if ($frontendPort) {
 }
 
 # Start Backend
-Write-Host "`n📦 Starting Backend Server (Port 8000)..." -ForegroundColor Cyan
-$backendJob = Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot'; & '.\venv\Scripts\python.exe' -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000" -PassThru
+Write-Host "`n📦 Starting Backend Server (Port 8080)..." -ForegroundColor Cyan
+$backendJob = Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$PSScriptRoot'; & '.\venv\Scripts\python.exe' -m uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080" -PassThru
 Write-Host "✓ Backend starting (PID: $($backendJob.Id))" -ForegroundColor Green
 
 # Wait for backend to be ready
 Write-Host "⏳ Waiting for backend to start..." -ForegroundColor Yellow
-$maxAttempts = 30
+$maxAttempts = 10
 $attempt = 0
 $backendReady = $false
 
 while ($attempt -lt $maxAttempts -and -not $backendReady) {
     Start-Sleep -Seconds 1
     try {
-        $response = Invoke-WebRequest -Uri "http://192.168.4.28:8000/docs" -TimeoutSec 2 -ErrorAction SilentlyContinue
+        $response = Invoke-WebRequest -Uri "http://localhost:8080/docs" -TimeoutSec 2 -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
             $backendReady = $true
         }
@@ -133,7 +133,7 @@ $frontendReady = $false
 while ($attempt -lt $maxAttempts -and -not $frontendReady) {
     Start-Sleep -Seconds 1
     try {
-        $response = Invoke-WebRequest -Uri "http://192.168.4.28:3000" -TimeoutSec 2 -ErrorAction SilentlyContinue
+        $response = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 2 -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
             $frontendReady = $true
         }
@@ -153,26 +153,26 @@ if ($frontendReady) {
 Write-Host "`n✅ LifeOS Started!" -ForegroundColor Green
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 Write-Host "LOCAL URLS:" -ForegroundColor Yellow
-Write-Host "Backend:        http://192.168.4.28:8000/docs" -ForegroundColor White
-Write-Host "Frontend:       http://192.168.4.28:3000" -ForegroundColor White
+Write-Host "Backend:        http://localhost:8080/docs" -ForegroundColor White
+Write-Host "Frontend:       http://localhost:3000" -ForegroundColor White
 
 # Check Home Assistant status and display URL
 $haStatus = docker ps --filter "name=home-assistant" --format "{{.Status}}" 2>$null
 if ($haStatus -like "Up*") {
-    Write-Host "Home Assistant: http://192.168.4.28:8123" -ForegroundColor White
+    Write-Host "Home Assistant: http://localhost:8123" -ForegroundColor White
 }
 
 # Check if Cloudflare tunnel is running and display public URLs
-$tunnelRunning = Get-Process -Name cloudflared -ErrorAction SilentlyContinue
-if ($tunnelRunning) {
-    Write-Host "`nPUBLIC URLS (via Cloudflare):" -ForegroundColor Yellow
-    Write-Host "Backend:        https://api.life-os-dashboard.com" -ForegroundColor Cyan
-    Write-Host "Frontend:       https://life-os-dashboard.com" -ForegroundColor Cyan
-}
+# $tunnelRunning = Get-Process -Name cloudflared -ErrorAction SilentlyContinue
+# if ($tunnelRunning) {
+#     Write-Host "`nPUBLIC URLS (via Cloudflare):" -ForegroundColor Yellow
+#     Write-Host "Backend:        https://api.life-os-dashboard.com" -ForegroundColor Cyan
+#     Write-Host "Frontend:       https://life-os-dashboard.com" -ForegroundColor Cyan
+# }
 
-Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
-Write-Host "`nPress any key to run health checks..." -ForegroundColor Yellow
-$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+# Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
+# Write-Host "`nPress any key to run health checks..." -ForegroundColor Yellow
+# $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
 
 # Run health checks
 & "$PSScriptRoot\health-check.ps1"

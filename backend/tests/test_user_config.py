@@ -1,7 +1,7 @@
 import requests
 import json
 
-url = "http://192.168.4.28:8000/api/user/config"
+url = "http://192.168.4.28:8080/api/user/config"
 
 # Simple test data
 data = {

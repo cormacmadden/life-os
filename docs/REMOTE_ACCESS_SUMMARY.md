@@ -8,7 +8,7 @@ I've implemented a complete remote access solution for your Life OS dashboard wi
 
 ### 1. `frontend/lib/api.ts`
 - Core API URL detection logic
-- Automatically tries local IP first (192.168.4.28:8000)
+- Automatically tries local IP first (192.168.4.28:8080)
 - Falls back to Cloudflare URL if local unreachable
 - Caches result for performance
 - 500ms timeout for quick fallback
@@ -57,7 +57,7 @@ I've implemented a complete remote access solution for your Life OS dashboard wi
 ```
 Browser → 192.168.4.28:3000 (Frontend)
           ↓
-        192.168.4.28:8000 (Backend API)
+        192.168.4.28:8080 (Backend API)
         ↓
       Fast local network speed ⚡
 ```
@@ -75,7 +75,7 @@ Browser → https://lifeos-app.trycloudflare.com (Frontend)
 
 ### Auto-Detection Flow
 1. Page loads
-2. Tries to reach `http://192.168.4.28:8000/docs` (500ms timeout)
+2. Tries to reach `http://192.168.4.28:8080/docs` (500ms timeout)
 3. If successful → uses local IP (fast)
 4. If fails → uses Cloudflare URL (remote)
 5. Caches result for session
@@ -101,7 +101,7 @@ Browser → https://lifeos-app.trycloudflare.com (Frontend)
 4. **Start Everything:**
    ```powershell
    # Terminal 1 - Backend
-   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+   uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080
    
    # Terminal 2 - Frontend
    cd frontend
@@ -119,7 +119,7 @@ Browser → https://lifeos-app.trycloudflare.com (Frontend)
 
 Your current code uses hardcoded URL:
 ```typescript
-const API_BASE_URL = "http://192.168.4.28:8000";
+const API_BASE_URL = "http://192.168.4.28:8080";
 ```
 
 To use auto-detection, update to:

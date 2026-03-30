@@ -111,7 +111,7 @@ npm run dev
 
 ### If widgets show "loading..." forever:
 - Check browser console for errors
-- Verify API is running: http://localhost:8000/docs
+- Verify API is running: http://localhost:8080/docs
 - Clear browser cache: Ctrl+Shift+R
 
 ### If build fails:

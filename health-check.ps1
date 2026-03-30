@@ -69,28 +69,28 @@ function Test-JsonEndpoint {
 }
 
 # Backend Tests
-Write-Host "`n━━━ Backend Tests (Port 8000) ━━━" -ForegroundColor Cyan
+Write-Host "`n\u2501\u2501\u2501 Backend Tests (Port 8080) \u2501\u2501\u2501" -ForegroundColor Cyan
 
-$result = Test-Endpoint "Backend API Docs" "http://192.168.4.28:8000/docs"
+$result = Test-Endpoint "Backend API Docs" "http://localhost:8080/docs"
 $allPassed = $allPassed -and $result
 
-$result = Test-JsonEndpoint "User Config Endpoint" "http://192.168.4.28:8000/api/user/config" @("morning_bus_stops", "evening_bus_stops", "home_address", "work_address")
+$result = Test-JsonEndpoint "User Config Endpoint" "http://localhost:8080/api/user/config" @("morning_bus_stops", "evening_bus_stops", "home_address", "work_address")
 $allPassed = $allPassed -and $result
 
-$result = Test-JsonEndpoint "Bus Stops Endpoint" "http://192.168.4.28:8000/api/bus/stops" @("stops")
+$result = Test-JsonEndpoint "Bus Stops Endpoint" "http://localhost:8080/api/bus/stops" @("stops")
 $allPassed = $allPassed -and $result
 
-$result = Test-JsonEndpoint "Bus Locations Endpoint" "http://192.168.4.28:8000/api/bus/locations" @("locations")
+$result = Test-JsonEndpoint "Bus Locations Endpoint" "http://localhost:8080/api/bus/locations" @("locations")
 $allPassed = $allPassed -and $result
 
-$result = Test-JsonEndpoint "Weather Endpoint" "http://192.168.4.28:8000/api/weather/current" @("cities")
+$result = Test-JsonEndpoint "Weather Endpoint" "http://localhost:8080/api/weather/current" @("cities")
 $allPassed = $allPassed -and $result
 
 # Test geocoding endpoint (optional - may not be available on older backend versions)
 Write-Host "`n🔍 Testing: Geocoding Endpoint (Optional)" -ForegroundColor Yellow
-Write-Host "   URL: http://192.168.4.28:8000/api/user/geocode?address=Birmingham, UK" -ForegroundColor Gray
+Write-Host "   URL: http://localhost:8080/api/user/geocode?address=Birmingham, UK" -ForegroundColor Gray
 try {
-    $geocodeResponse = Invoke-RestMethod -Uri "http://192.168.4.28:8000/api/user/geocode?address=Birmingham, UK" -TimeoutSec 5 -ErrorAction Stop
+    $geocodeResponse = Invoke-RestMethod -Uri "http://localhost:8080/api/user/geocode?address=Birmingham, UK" -TimeoutSec 5 -ErrorAction Stop
     if ($geocodeResponse.success -eq $true -and $geocodeResponse.latitude -and $geocodeResponse.longitude) {
         Write-Host "   ✓ PASS - Geocoding working (lat: $($geocodeResponse.latitude), lon: $($geocodeResponse.longitude))" -ForegroundColor Green
     } else {
@@ -108,14 +108,14 @@ try {
 # Frontend Tests
 Write-Host "`n━━━ Frontend Tests (Port 3000) ━━━" -ForegroundColor Cyan
 
-$result = Test-Endpoint "Frontend Homepage" "http://192.168.4.28:3000"
+$result = Test-Endpoint "Frontend Homepage" "http://localhost:3000"
 $allPassed = $allPassed -and $result
 
 # Test frontend by checking if it loads (skip checking specific chunk files as they change)
 Write-Host "`n🔍 Testing: Frontend Content" -ForegroundColor Yellow
-Write-Host "   URL: http://192.168.4.28:3000" -ForegroundColor Gray
+Write-Host "   URL: http://localhost:3000" -ForegroundColor Gray
 try {
-    $frontendResponse = Invoke-WebRequest -Uri "http://192.168.4.28:3000" -TimeoutSec 5 -ErrorAction Stop
+    $frontendResponse = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 5 -ErrorAction Stop
     if ($frontendResponse.Content -match "LifeOS|life-os" -or $frontendResponse.Content -match "_next") {
         Write-Host "   ✓ PASS - Frontend content loads correctly" -ForegroundColor Green
     } else {
@@ -129,13 +129,13 @@ try {
 # Port Check
 Write-Host "`n━━━ Port Status ━━━" -ForegroundColor Cyan
 
-$backend = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+$backend = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
 $frontend = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue
 
 if ($backend) {
-    Write-Host "   ✓ Backend listening on port 8000 (PID: $($backend[0].OwningProcess))" -ForegroundColor Green
+    Write-Host "   \u2713 Backend listening on port 8080 (PID: $($backend[0].OwningProcess))" -ForegroundColor Green
 } else {
-    Write-Host "   ✗ Backend NOT listening on port 8000" -ForegroundColor Red
+    Write-Host "   ✗ Backend NOT listening on port 8080" -ForegroundColor Red
     $allPassed = $false
 }
 

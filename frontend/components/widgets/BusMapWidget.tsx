@@ -222,7 +222,7 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
         
         const attemptShow = () => {
           attempts++;
-          const delay = Math.min(500 * Math.pow(2, attempts - 1), 8000);
+          const delay = Math.min(500 * Math.pow(2, attempts - 1), 8080);
           
           setTimeout(() => {
             if (mapInstanceRef.current && (window as any).L) {

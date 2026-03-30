@@ -6,8 +6,8 @@ Write-Host "🛑 Stopping LifeOS..." -ForegroundColor Cyan
 
 $stopped = $false
 
-# Stop Backend (Port 8000)
-$backendPort = Get-NetTCPConnection -LocalPort 8000 -State Listen -ErrorAction SilentlyContinue
+# Stop Backend (Port 8080)
+$backendPort = Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue
 if ($backendPort) {
     Write-Host "   Stopping Backend (PID: $($backendPort[0].OwningProcess))..." -ForegroundColor Yellow
     Stop-Process -Id $backendPort[0].OwningProcess -Force -ErrorAction SilentlyContinue

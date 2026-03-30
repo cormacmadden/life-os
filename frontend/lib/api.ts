@@ -6,8 +6,8 @@
  *   const data = await fetch(`${await apiUrl()}/api/endpoint`);
  */
 
-const LOCAL_API_URL = 'http://192.168.4.28:8000';
-const REMOTE_API_URL = process.env.NEXT_PUBLIC_CLOUDFLARE_URL || 'http://127.0.0.1:8000';
+const LOCAL_API_URL = process.env.NEXT_PUBLIC_LOCAL_BACKEND_URL || 'http://localhost:8080';
+const REMOTE_API_URL = process.env.NEXT_PUBLIC_PROD_BACKEND_URL || 'http://localhost:8080';
 const DETECTION_TIMEOUT = 500; // ms
 
 let cachedUrl: string | null = null;

@@ -9,7 +9,7 @@
 4. Fill in the details:
    - **App name**: LifeOS
    - **App description**: Personal dashboard integration
-   - **Redirect URI**: `http://localhost:8000/api/spotify/callback`
+   - **Redirect URI**: `http://localhost:8080/api/spotify/callback`
    - **API**: Select "Web API"
 5. Accept the terms and click "Save"
 
@@ -24,7 +24,7 @@ Edit `backend/.env` and replace these values:
 ```env
 SPOTIFY_CLIENT_ID=your_actual_client_id_here
 SPOTIFY_CLIENT_SECRET=your_actual_client_secret_here
-SPOTIFY_REDIRECT_URI=http://localhost:8000/api/spotify/callback
+SPOTIFY_REDIRECT_URI=http://localhost:8080/api/spotify/callback
 ```
 
 ### 4. Restart Your Backend
@@ -32,7 +32,7 @@ The uvicorn server should auto-reload, but if needed:
 ```powershell
 # Stop and restart in the uvicorn terminal
 # Ctrl+C then run again:
-uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
+uvicorn backend.main:app --reload --host 0.0.0.0 --port 8080
 ```
 
 ### 5. Connect Spotify
@@ -53,7 +53,7 @@ uvicorn backend.main:app --reload --host 0.0.0.0 --port 8000
 
 **"Not authenticated" error:**
 - Make sure you've set up your Spotify app credentials correctly
-- Check that the redirect URI in your Spotify app matches exactly: `http://localhost:8000/api/spotify/callback`
+- Check that the redirect URI in your Spotify app matches exactly: `http://localhost:8080/api/spotify/callback`
 
 **"No track currently playing":**
 - Open Spotify on any device and start playing a song
