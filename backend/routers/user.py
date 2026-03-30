@@ -183,31 +183,31 @@ async def get_user_config(
     )
     config = result.scalar_one_or_none()
         
-        if not config:
-            # Return default empty config
-            return {
-                "morning_bus_stops": "",
-                "evening_bus_stops": "",
-                "relevant_routes": "",
-                "home_address": "",
-                "home_latitude": None,
-                "home_longitude": None,
-                "work_address": "",
-                "work_latitude": None,
-                "work_longitude": None
-            }
-        
+    if not config:
+        # Return default empty config
         return {
-            "morning_bus_stops": config.morning_bus_stops or "",
-            "evening_bus_stops": config.evening_bus_stops or "",
-            "relevant_routes": config.relevant_routes or "",
-            "home_address": config.home_address or "",
-            "home_latitude": config.home_latitude,
-            "home_longitude": config.home_longitude,
-            "work_address": config.work_address or "",
-            "work_latitude": config.work_latitude,
-            "work_longitude": config.work_longitude
+            "morning_bus_stops": "",
+            "evening_bus_stops": "",
+            "relevant_routes": "",
+            "home_address": "",
+            "home_latitude": None,
+            "home_longitude": None,
+            "work_address": "",
+            "work_latitude": None,
+            "work_longitude": None
         }
+    
+    return {
+        "morning_bus_stops": config.morning_bus_stops or "",
+        "evening_bus_stops": config.evening_bus_stops or "",
+        "relevant_routes": config.relevant_routes or "",
+        "home_address": config.home_address or "",
+        "home_latitude": config.home_latitude,
+        "home_longitude": config.home_longitude,
+        "work_address": config.work_address or "",
+        "work_latitude": config.work_latitude,
+        "work_longitude": config.work_longitude
+    }
 
 @router.put("/config")
 async def update_user_config(
@@ -223,79 +223,79 @@ async def update_user_config(
         )
         config = result.scalar_one_or_none()
             
-            # Geocode addresses if provided (with timeout protection)
-            home_lat, home_lng = None, None
-            work_lat, work_lng = None, None
+        # Geocode addresses if provided (with timeout protection)
+        home_lat, home_lng = None, None
+        work_lat, work_lng = None, None
+        
+        try:
+            if config_data.home_address and config_data.home_address.strip():
+                try:
+                    home_lat, home_lng = await geocode_address(config_data.home_address)
+                    print(f"✓ Geocoded home address '{config_data.home_address}' to: {home_lat}, {home_lng}")
+                except Exception as e:
+                    print(f"⚠ Failed to geocode home address: {e}")
             
-            try:
-                if config_data.home_address and config_data.home_address.strip():
-                    try:
-                        home_lat, home_lng = await geocode_address(config_data.home_address)
-                        print(f"✓ Geocoded home address '{config_data.home_address}' to: {home_lat}, {home_lng}")
-                    except Exception as e:
-                        print(f"⚠ Failed to geocode home address: {e}")
-                
-                if config_data.work_address and config_data.work_address.strip():
-                    try:
-                        work_lat, work_lng = await geocode_address(config_data.work_address)
-                        print(f"✓ Geocoded work address '{config_data.work_address}' to: {work_lat}, {work_lng}")
-                    except Exception as e:
-                        print(f"⚠ Failed to geocode work address: {e}")
-            except Exception as e:
-                print(f"⚠ Geocoding error (continuing without coordinates): {e}")
+            if config_data.work_address and config_data.work_address.strip():
+                try:
+                    work_lat, work_lng = await geocode_address(config_data.work_address)
+                    print(f"✓ Geocoded work address '{config_data.work_address}' to: {work_lat}, {work_lng}")
+                except Exception as e:
+                    print(f"⚠ Failed to geocode work address: {e}")
+        except Exception as e:
+            print(f"⚠ Geocoding error (continuing without coordinates): {e}")
+        
+        if not config:
+            # Create new config
+            config = UserConfig(
+                user_id=user.id,
+                morning_bus_stops=config_data.morning_bus_stops,
+                evening_bus_stops=config_data.evening_bus_stops,
+                relevant_routes=config_data.relevant_routes,
+                home_address=config_data.home_address,
+                home_latitude=home_lat,
+                home_longitude=home_lng,
+                work_address=config_data.work_address,
+                work_latitude=work_lat,
+                work_longitude=work_lng
+            )
+            session.add(config)
+            await session.commit()
+            await session.refresh(config)
+        else:
+            # Update existing config (config is already in session from query)
+            if config_data.morning_bus_stops is not None:
+                config.morning_bus_stops = config_data.morning_bus_stops
+            if config_data.evening_bus_stops is not None:
+                config.evening_bus_stops = config_data.evening_bus_stops
+            if config_data.relevant_routes is not None:
+                config.relevant_routes = config_data.relevant_routes
+            if config_data.home_address is not None:
+                config.home_address = config_data.home_address
+                config.home_latitude = home_lat
+                config.home_longitude = home_lng
+            if config_data.work_address is not None:
+                config.work_address = config_data.work_address
+                config.work_latitude = work_lat
+                config.work_longitude = work_lng
             
-            if not config:
-                # Create new config
-                config = UserConfig(
-                    user_id=user.id,
-                    morning_bus_stops=config_data.morning_bus_stops,
-                    evening_bus_stops=config_data.evening_bus_stops,
-                    relevant_routes=config_data.relevant_routes,
-                    home_address=config_data.home_address,
-                    home_latitude=home_lat,
-                    home_longitude=home_lng,
-                    work_address=config_data.work_address,
-                    work_latitude=work_lat,
-                    work_longitude=work_lng
-                )
-                session.add(config)
-                await session.commit()
-                await session.refresh(config)
-            else:
-                # Update existing config (config is already in session from query)
-                if config_data.morning_bus_stops is not None:
-                    config.morning_bus_stops = config_data.morning_bus_stops
-                if config_data.evening_bus_stops is not None:
-                    config.evening_bus_stops = config_data.evening_bus_stops
-                if config_data.relevant_routes is not None:
-                    config.relevant_routes = config_data.relevant_routes
-                if config_data.home_address is not None:
-                    config.home_address = config_data.home_address
-                    config.home_latitude = home_lat
-                    config.home_longitude = home_lng
-                if config_data.work_address is not None:
-                    config.work_address = config_data.work_address
-                    config.work_latitude = work_lat
-                    config.work_longitude = work_lng
-                
-                await session.commit()
-                await session.refresh(config)
-            
-            # Build response while still in session context
-            return {
-                "message": "Configuration updated successfully",
-                "config": {
-                    "morning_bus_stops": config.morning_bus_stops or "",
-                    "evening_bus_stops": config.evening_bus_stops or "",
-                    "relevant_routes": config.relevant_routes or "",
-                    "home_address": config.home_address or "",
-                    "home_latitude": config.home_latitude,
-                    "home_longitude": config.home_longitude,
-                    "work_address": config.work_address or "",
-                    "work_latitude": config.work_latitude,
-                    "work_longitude": config.work_longitude
-                }
+            await session.commit()
+            await session.refresh(config)
+        
+        # Build response while still in session context
+        return {
+            "message": "Configuration updated successfully",
+            "config": {
+                "morning_bus_stops": config.morning_bus_stops or "",
+                "evening_bus_stops": config.evening_bus_stops or "",
+                "relevant_routes": config.relevant_routes or "",
+                "home_address": config.home_address or "",
+                "home_latitude": config.home_latitude,
+                "home_longitude": config.home_longitude,
+                "work_address": config.work_address or "",
+                "work_latitude": config.work_latitude,
+                "work_longitude": config.work_longitude
             }
+        }
     except Exception as e:
         print(f"Error updating user config: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to update configuration: {str(e)}")
