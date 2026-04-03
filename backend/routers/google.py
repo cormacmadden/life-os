@@ -180,7 +180,7 @@ async def get_user_google_creds(user: User, session: Session):
         UserToken.user_id == user.id,
         UserToken.service == "google"
     )
-    token = session.exec(statement).first()
+    token = (await session.exec(statement)).first()
     
     if not token:
         return None

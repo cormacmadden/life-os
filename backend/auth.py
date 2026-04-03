@@ -85,18 +85,32 @@ async def get_current_user(
     
     return user
 
-async def require_user(user: Optional[User] = Depends(get_current_user)) -> User:
+async def require_user(user: Optional[User] = Depends(get_current_user), session: Session = Depends(get_session)) -> User:
     """
-    Require authentication - raises 401 if no user is logged in.
-    Use this as a dependency for protected endpoints.
+    Require authentication - in personal/dev mode, auto-creates and returns
+    a default user. In production, raises 401 if no user is logged in.
     """
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"}
-        )
-    return user
+    if user:
+        return user
+
+    # Personal mode: get or create a default user
+    import os
+    if os.getenv("PERSONAL_MODE", "true").lower() == "true":
+        from sqlmodel import select as sql_select
+        result = await session.execute(sql_select(User).where(User.email == "comadden@gmail.com"))
+        default_user = result.scalar_one_or_none()
+        if not default_user:
+            default_user = User(email="comadden@gmail.com", name="Cormac Madden")
+            session.add(default_user)
+            await session.commit()
+            await session.refresh(default_user)
+        return default_user
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required",
+        headers={"WWW-Authenticate": "Bearer"}
+    )
 
 def set_auth_cookie(response: Response, token: str):
     """Set authentication cookie in response"""

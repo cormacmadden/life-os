@@ -99,3 +99,40 @@ class UserConfig(SQLModel, table=True):
     work_address: Optional[str] = None
     work_latitude: Optional[float] = None
     work_longitude: Optional[float] = None
+
+class Workout(SQLModel, table=True):
+    """A workout session (e.g., 'Evening Workout')"""
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    user_id: int = Field(default=1, foreign_key="user.id")
+    name: str = Field(index=True)  # e.g., "Evening Workout"
+    date: datetime = Field(index=True)  # When the workout happened
+    notes: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    
+    exercises: List["Exercise"] = Relationship(back_populates="workout", cascade_delete=True)
+
+class Exercise(SQLModel, table=True):
+    """An exercise within a workout (e.g., 'Bench Press')"""
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    workout_id: int = Field(foreign_key="workout.id")
+    name: str = Field(index=True)  # e.g., "Bench Press (Dumbbell)"
+    order: int = 0  # Position in the workout
+    notes: Optional[str] = None
+    
+    workout: Optional[Workout] = Relationship(back_populates="exercises")
+    sets: List["Set"] = Relationship(back_populates="exercise", cascade_delete=True)
+
+class Set(SQLModel, table=True):
+    """A single set within an exercise (e.g., Set 1: 50kg x 8 reps)"""
+    __table_args__ = {"extend_existing": True}
+    id: Optional[int] = Field(default=None, primary_key=True)
+    exercise_id: int = Field(foreign_key="exercise.id")
+    set_number: int
+    weight_kg: Optional[float] = None  # None for bodyweight exercises
+    reps: int
+    notes: Optional[str] = None
+    
+    exercise: Optional[Exercise] = Relationship(back_populates="sets")

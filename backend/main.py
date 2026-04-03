@@ -9,10 +9,10 @@ import threading
 
 # NOTE: Imports must use the leading dot ('.') since uvicorn runs from the parent directory.
 from backend.database import engine
-from backend.models import SQLModel, User, UserToken, Plant, Car, MaintenanceRecord, UserConfig
+from backend.models import SQLModel, User, UserToken, Plant, Car, MaintenanceRecord, UserConfig, Workout, Exercise, Set
 
 # Import all your routers
-from .routers import transport, google, smarthome, plants, spotify, garmin, car, monzo, weather, user
+from .routers import transport, google, smarthome, plants, spotify, garmin, car, monzo, weather, user, workouts
 
 # Configure access logger
 access_logger = logging.getLogger("lifeos.access")
@@ -47,6 +47,7 @@ app = FastAPI(lifespan=lifespan)
 ORIGINS = [
     "http://localhost:3000",
     "http://192.168.4.28:3000",
+    "http://192.168.1.214:3000",
     "https://life-os-dashboard.com",
     "https://www.life-os-dashboard.com"
 ]
@@ -79,6 +80,7 @@ app.include_router(car.router, prefix="/api/car")
 app.include_router(monzo.router, prefix="/api/monzo")
 app.include_router(weather.router, prefix="/api/weather")
 app.include_router(user.router, prefix="/api/user")
+app.include_router(workouts.router, prefix="")
 
 @app.get("/api/debug/env")
 async def debug_env():

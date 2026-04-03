@@ -23,13 +23,14 @@ SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIFY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI", "http://localhost:8080/api/spotify/callback")
 
-def get_user_spotify_token(user: User, session: Session) -> Optional[UserToken]:
+async def get_user_spotify_token(user: User, session: Session) -> Optional[UserToken]:
     """Get Spotify token for a specific user from database."""
     statement = select(UserToken).where(
         UserToken.user_id == user.id,
         UserToken.service == "spotify"
     )
-    return session.exec(statement).first()
+    result = await session.execute(statement)
+    return result.scalars().first()
 
 def get_auth_header() -> str:
     """Generate Basic Auth header for Spotify API."""
@@ -40,7 +41,7 @@ def get_auth_header() -> str:
 
 async def refresh_spotify_token(user: User, session: Session) -> bool:
     """Refresh the Spotify access token using the refresh token."""
-    token = get_user_spotify_token(user, session)
+    token = await get_user_spotify_token(user, session)
     if not token or not token.refresh_token:
         return False
     
@@ -64,7 +65,7 @@ async def refresh_spotify_token(user: User, session: Session) -> bool:
                 token.expires_at = datetime.now() + timedelta(seconds=data["expires_in"])
                 token.updated_at = datetime.now()
                 session.add(token)
-                session.commit()
+                await session.commit()
                 return True
         except Exception as e:
             print(f"Error refreshing Spotify token: {e}")
@@ -73,14 +74,14 @@ async def refresh_spotify_token(user: User, session: Session) -> bool:
 
 async def get_valid_spotify_token(user: User, session: Session) -> Optional[str]:
     """Get a valid access token, refreshing if necessary."""
-    token = get_user_spotify_token(user, session)
+    token = await get_user_spotify_token(user, session)
     if not token or not token.access_token:
         return None
     
     # Check if token is expired or about to expire
     if token.expires_at and datetime.now() >= token.expires_at - timedelta(minutes=5):
         if await refresh_spotify_token(user, session):
-            token = get_user_spotify_token(user, session)
+            token = await get_user_spotify_token(user, session)
             return token.access_token if token else None
         return None
     
@@ -132,7 +133,7 @@ async def spotify_callback(
                 data = response.json()
                 
                 # Find or create Spotify token for user
-                existing_token = get_user_spotify_token(user, session)
+                existing_token = await get_user_spotify_token(user, session)
                 
                 if existing_token:
                     existing_token.access_token = data["access_token"]
@@ -149,7 +150,7 @@ async def spotify_callback(
                     )
                     session.add(new_token)
                 
-                session.commit()
+                await session.commit()
                 print(f"Spotify tokens saved for user {user.email}")
                 
                 # Redirect to frontend
@@ -167,7 +168,7 @@ async def token_status(
     session: Session = Depends(get_session)
 ):
     """Debug endpoint to check token status."""
-    token = get_user_spotify_token(user, session)
+    token = await get_user_spotify_token(user, session)
     return {
         "has_access_token": bool(token and token.access_token),
         "has_refresh_token": bool(token and token.refresh_token),
@@ -177,16 +178,10 @@ async def token_status(
 
 @router.get("/current-track")
 async def get_current_track(
-    user: Optional[User] = Depends(get_current_user),
+    user: User = Depends(require_user),
     session: Session = Depends(get_session)
 ):
     """Get currently playing track."""
-    if not user:
-        return {
-            "authenticated": False,
-            "playing": False,
-            "message": "Please log in to see Spotify data"
-        }
     
     token = await get_valid_spotify_token(user, session)
     
@@ -414,7 +409,7 @@ async def previous_track(user: User = Depends(require_user), session: Session = 
 @router.get("/status")
 async def get_status(user: User = Depends(require_user), session: Session = Depends(get_session)):
     """Check authentication status."""
-    token_obj = get_user_spotify_token(user, session)
+    token_obj = await get_user_spotify_token(user, session)
     return {
         "authenticated": token_obj is not None and token_obj.access_token is not None,
         "has_refresh_token": token_obj is not None and token_obj.refresh_token is not None,

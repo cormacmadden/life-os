@@ -101,6 +101,11 @@ const CarWidget = dynamic(() => import('@/components/widgets/CarWidget').then(mo
   ssr: false
 });
 
+const WorkoutWidget = dynamic(() => import('@/components/widgets/WorkoutWidget'), {
+  loading: () => <WidgetLoading title="workouts" icon={Activity} />,
+  ssr: false
+});
+
 const WeatherWidget = dynamic(() => import('@/components/widgets/WeatherWidget').then(mod => ({ default: mod.WeatherWidget })), {
   loading: () => <WidgetLoading title="weather" icon={Thermometer} />,
   ssr: false
@@ -168,13 +173,15 @@ export default function App() {
     finance: true,
     email: true,
     weather: true,
+    workouts: true,
   });
 
   // Load from localStorage after mount (client-side only)
+  // Merge with defaults so new widgets show up automatically
   useEffect(() => {
     const saved = localStorage.getItem('widgetVisibility');
     if (saved) {
-      setWidgetVisibility(JSON.parse(saved));
+      setWidgetVisibility(prev => ({ ...prev, ...JSON.parse(saved) }));
     }
   }, []);
 
@@ -571,6 +578,7 @@ export default function App() {
         {/* COL 2 */}
         <div className="col-span-1 space-y-6">
           {widgetVisibility.weather && <WeatherWidget apiUrl={API_BASE_URL} />}
+          {widgetVisibility.workouts && <WorkoutWidget apiUrl={API_BASE_URL} />}
           {widgetVisibility.garmin && <GarminWidget apiUrl={API_BASE_URL} />}
           {widgetVisibility.smarthome && (
             <SmartHomeWidget apiUrl={API_BASE_URL} homeState={homeState} handleSmartHomeToggle={handleSmartHomeToggle} />

@@ -127,9 +127,9 @@ export const GarminWidget: React.FC<GarminWidgetProps> = ({ apiUrl }) => {
   };
 
   useEffect(() => {
-    if (apiUrl) {
-      fetchGarminData();
-    }
+    // if (apiUrl) {
+    //   fetchGarminData();
+    // }
     // No interval - only fetches on page load/refresh
   }, [apiUrl]);
 
