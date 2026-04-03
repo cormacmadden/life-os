@@ -1,0 +1,40 @@
+name: Deploy life-os
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build backend image
+        run: docker build -t life-os-backend:latest .
+
+      - name: Build frontend image
+        run: docker build -t life-os-frontend:latest -f frontend/Dockerfile .
+
+      - name: Redeploy Portainer stack
+        env:
+          PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
+          PORTAINER_TOKEN: ${{ secrets.PORTAINER_TOKEN }}
+        run: |
+          STACK_ID=$(curl -sk \
+            -H "X-API-Key: $PORTAINER_TOKEN" \
+            "$PORTAINER_URL/api/stacks" \
+            | jq '.[] | select(.Name=="life-os") | .Id')
+
+          STACK_CONTENT=$(curl -sk \
+            -H "X-API-Key: $PORTAINER_TOKEN" \
+            "$PORTAINER_URL/api/stacks/$STACK_ID/file" \
+            | jq '.StackFileContent | tojson')
+
+          curl -sk -X PUT \
+            -H "X-API-Key: $PORTAINER_TOKEN" \
+            -H "Content-Type: application/json" \
+            "$PORTAINER_URL/api/stacks/$STACK_ID?endpointId=1" \
+            -d "{\"pullImage\": false, \"prune\": false, \"stackFileContent\": $STACK_CONTENT}"
