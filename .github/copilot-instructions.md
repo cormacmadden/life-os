@@ -35,7 +35,6 @@ LifeOS is a personal dashboard that integrates with various services like Spotif
 
 ### **Database**
 - **Default:** SQLite (local development).
-- **Migration:** Migration scripts are located in `backend/` (e.g., `migrate_add_image_url.py`).
 
 ### **Remote Access**
 - **Cloudflare Tunnel:** Used for secure remote access to the backend and frontend.

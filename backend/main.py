@@ -11,6 +11,7 @@ from backend.models import SQLModel, User, UserToken, Plant, Car, MaintenanceRec
 
 # Import all your routers
 from .routers import transport, google, smarthome, plants, spotify, garmin, car, monzo, weather, user, workouts
+from .routers.auth_routes import router as auth_router
 
 # Configure access logger
 access_logger = logging.getLogger("lifeos.access")
@@ -71,6 +72,7 @@ app.include_router(monzo.router, prefix="/api/monzo")
 app.include_router(weather.router, prefix="/api/weather")
 app.include_router(user.router, prefix="/api/user")
 app.include_router(workouts.router, prefix="")
+app.include_router(auth_router, prefix="/api/auth")
 
 @app.get("/api/init-db")
 async def init_db(x_init_secret: Optional[str] = Header(default=None)):

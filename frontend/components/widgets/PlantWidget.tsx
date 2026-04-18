@@ -20,7 +20,7 @@ export const PlantWidget: React.FC<PlantWidgetProps> = ({ apiUrl }) => {
     if (typeof window === 'undefined' || !apiUrl) return;
 
     setLoading(true);
-    fetch(`${apiUrl}/api/plants`)
+    fetch(`${apiUrl}/api/plants`, { credentials: 'include' })
       .then(res => res.json())
       .then(data => {
         if (Array.isArray(data)) {

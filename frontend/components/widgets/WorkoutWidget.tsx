@@ -60,9 +60,9 @@ const WorkoutWidget: React.FC<WorkoutWidgetProps> = ({ apiUrl = '' }) => {
     const fetchData = async () => {
       try {
         const [recentRes, habitRes, statsRes] = await Promise.all([
-          fetch(`${apiUrl}/api/workouts/recent?limit=5`),
-          fetch(`${apiUrl}/api/workouts/habit-tracker?days=90`),
-          fetch(`${apiUrl}/api/workouts/stats?days=30`)
+          fetch(`${apiUrl}/api/workouts/recent?limit=5`, { credentials: 'include' }),
+          fetch(`${apiUrl}/api/workouts/habit-tracker?days=90`, { credentials: 'include' }),
+          fetch(`${apiUrl}/api/workouts/stats?days=30`, { credentials: 'include' })
         ]);
         
         if (recentRes.ok) setRecent(await recentRes.json());

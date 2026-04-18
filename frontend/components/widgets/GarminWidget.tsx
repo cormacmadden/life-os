@@ -84,10 +84,10 @@ export const GarminWidget: React.FC<GarminWidgetProps> = ({ apiUrl }) => {
     // Fetch fresh data
     try {
       const [statsRes, sleepRes, activitiesRes, bodyRes] = await Promise.all([
-        fetch(`${apiUrl}/api/garmin/stats`),
-        fetch(`${apiUrl}/api/garmin/sleep`),
-        fetch(`${apiUrl}/api/garmin/activities?limit=10`),
-        fetch(`${apiUrl}/api/garmin/body`)
+        fetch(`${apiUrl}/api/garmin/stats`, { credentials: 'include' }),
+        fetch(`${apiUrl}/api/garmin/sleep`, { credentials: 'include' }),
+        fetch(`${apiUrl}/api/garmin/activities?limit=10`, { credentials: 'include' }),
+        fetch(`${apiUrl}/api/garmin/body`, { credentials: 'include' })
       ]);
 
       // Check if any authentication errors

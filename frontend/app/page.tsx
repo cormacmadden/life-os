@@ -37,6 +37,7 @@ import { THEME } from '@/lib/theme';
 import { BusData, HomeState, Plant, CalendarEvent, Email, GoogleData, FinanceEntry, SpotifyState, ChatMessage, IdentityState} from '@/lib/types';
 import { Card, CardHeader, CardContent } from '@/components/Card';
 import GoogleWidget from '@/components/widgets/GoogleWidget';
+import { useAuth } from '@/context/AuthContext';
 
 // Loading component for lazy-loaded widgets
 const WidgetLoading = ({ title, icon: Icon }: { title: string; icon: LucideIcon }) => (
@@ -156,6 +157,7 @@ const MOCK_FINANCE_DATA: FinanceEntry[] = [
 // --- Main App ---
 
 export default function App() {
+  const { user, logout } = useAuth();
   const [isClient, setIsClient] = useState(false);
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState<boolean>(false);
@@ -287,15 +289,15 @@ export default function App() {
     }
   }, []);
 
-  // Fetch integration statuses once API URL is detected
+  // Fetch integration statuses once API URL is confirmed ready
   useEffect(() => {
-    if (API_BASE_URL && isClient) {
+    if (apiUrlReady && isClient) {
       console.log("Fetching integration statuses with API_BASE_URL:", API_BASE_URL);
       fetchGoogleData();
       fetchSpotifyStatus();
       fetchMonzoStatus();
     }
-  }, [API_BASE_URL, isClient]);
+  }, [apiUrlReady, isClient]);
 
   // Refresh Google data when returning from OAuth (detect by checking if we just loaded)
   useEffect(() => {
@@ -421,10 +423,10 @@ export default function App() {
 
   useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
-  // Load user config on mount
+  // Load user config once API is ready and user is authenticated
   useEffect(() => {
     const loadUserConfig = async () => {
-      if (!API_BASE_URL || !apiUrlReady) return;
+      if (!API_BASE_URL || !apiUrlReady || !user) return;
       
       console.log('⏳ Loading user config from:', API_BASE_URL);
       setConfigLoading(true);
@@ -466,7 +468,7 @@ export default function App() {
     };
     
     loadUserConfig();
-  }, [API_BASE_URL, apiUrlReady]);
+  }, [API_BASE_URL, apiUrlReady, user]);
 
   const saveUserConfig = async () => {
     setSaveButtonState('saving');
@@ -771,7 +773,7 @@ export default function App() {
       <div className={`lg:hidden flex items-center justify-between p-4 ${THEME.bgDarker} sticky top-0 z-20`}><h1 className={`${THEME.main} font-bold text-xl`}>life_os</h1><button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className={`p-2 rounded ${THEME.bg}`}>{isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}</button></div>
       <div className="flex h-[calc(100vh-64px)] lg:h-screen overflow-hidden">
         <aside className={`fixed lg:static inset-y-0 left-0 z-30 w-64 ${THEME.bgDarker} transform transition-transform duration-300 ease-in-out ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
-          <div className="h-full flex flex-col p-4"><div className="p-4 hidden lg:block mb-6"><h1 className={`${THEME.main} font-bold text-2xl`}>life_os</h1><p className={`text-xs ${THEME.sub} mt-1`}>v1.0.0 // stable</p></div><nav className="flex-1 space-y-2"><NavItem id="dashboard" icon={Home} label="dashboard" /><NavItem id="ai" icon={Terminal} label="terminal" /><NavItem id="settings" icon={Settings} label="config" /></nav></div>
+          <div className="h-full flex flex-col p-4"><div className="p-4 hidden lg:block mb-6"><h1 className={`${THEME.main} font-bold text-2xl`}>life_os</h1><p className={`text-xs ${THEME.sub} mt-1`}>v1.0.0 // stable</p></div><nav className="flex-1 space-y-2"><NavItem id="dashboard" icon={Home} label="dashboard" /><NavItem id="ai" icon={Terminal} label="terminal" /><NavItem id="settings" icon={Settings} label="config" /></nav><div className={`pt-4 border-t border-[#646669] mt-4`}>{user && (<div className="flex items-center gap-3 px-2 mb-3">{user.picture ? (<img src={user.picture} alt={user.name} className="w-8 h-8 rounded-full" />) : (<div className={`w-8 h-8 rounded-full ${THEME.bg} flex items-center justify-center text-xs ${THEME.main} font-bold`}>{(user.name || user.email)[0].toUpperCase()}</div>)}<div className="flex-1 min-w-0"><p className={`text-xs ${THEME.text} truncate`}>{user.name || user.email}</p><p className={`text-xs ${THEME.sub} truncate`}>{user.email}</p></div></div>)}<button onClick={logout} className={`flex items-center gap-2 px-4 py-2 rounded w-full text-left text-xs ${THEME.sub} hover:${THEME.text} hover:${THEME.bgDarker} transition-colors`}><Lock size={14}/><span>logout</span></button></div></div>
         </aside>
         <main className="flex-1 overflow-y-auto w-full p-4 md:p-6 lg:p-8" onClick={() => isMobileMenuOpen && setIsMobileMenuOpen(false)}><div className="max-w-7xl mx-auto h-full">{activeTab === 'dashboard' && renderDashboard()}{activeTab === 'ai' && renderAI()}{activeTab === 'settings' && renderSettings()}</div></main>
       </div>

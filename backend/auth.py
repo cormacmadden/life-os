@@ -79,7 +79,7 @@ async def get_current_user(
     user_id = int(payload.get("sub"))
     
     # Get user from database
-    user = session.get(User, user_id)
+    user = await session.get(User, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -89,7 +89,7 @@ async def get_current_user(
     # Update last login
     user.last_login = datetime.utcnow()
     session.add(user)
-    session.commit()
+    await session.commit()
     
     return user
 
@@ -122,11 +122,14 @@ async def require_user(user: Optional[User] = Depends(get_current_user), session
 
 def set_auth_cookie(response: Response, token: str):
     """Set authentication cookie in response"""
+    # Use secure=False for local HTTP development; set COOKIE_SECURE=true in production
+    secure = os.getenv("COOKIE_SECURE", "false").lower() == "true"
     response.set_cookie(
         key="access_token",
         value=token,
         httponly=True,
-        secure=True,  # Only send over HTTPS
+        secure=secure,
         samesite="lax",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+        path="/",
     )

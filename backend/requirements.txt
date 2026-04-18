@@ -10,3 +10,5 @@ google-auth-httplib2==0.2.0
 google-api-python-client==2.156.0
 sqlmodel==0.0.22
 pyjwt==2.8.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1

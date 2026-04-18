@@ -67,8 +67,9 @@ async def google_login():
 
 @router.get("/callback")
 async def google_callback(
-    code: str, 
+    code: str,
     response: Response,
+    state: str = None,
     session: Session = Depends(get_sync_session)
 ):
     """Handle Google OAuth callback and create/login user"""
@@ -78,7 +79,8 @@ async def google_callback(
         flow = Flow.from_client_secrets_file(
             CREDENTIALS_FILE,
             scopes=SCOPES,
-            redirect_uri=redirect_uri
+            redirect_uri=redirect_uri,
+            state=state,
         )
         # Suppress scope mismatch warnings
         import warnings
@@ -104,31 +106,39 @@ async def google_callback(
     name = user_info.get('name')
     picture = user_info.get('picture')
     
-    # Find or create user
-    statement = select(User).where(User.google_id == google_id)
-    existing_user = session.exec(statement).first()
-    
-    if existing_user:
-        print(f"🔵 Found existing user: {existing_user.email}")
-        user = existing_user
-        user.email = email  # Update in case it changed
+    # 1. Try to find user by google_id (returning user)
+    user = session.exec(select(User).where(User.google_id == google_id)).first()
+
+    if user:
+        print(f"🔵 Found existing user by google_id: {user.email}")
+        user.email = email
         user.name = name
         user.picture = picture
         user.last_login = datetime.datetime.utcnow()
     else:
-        # Create new user
-        print(f"🔵 Creating new user: {email}")
-        user = User(
-            email=email,
-            google_id=google_id,
-            name=name,
-            picture=picture,
-            last_login=datetime.datetime.utcnow()
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-        print(f"🔵 User created with ID: {user.id}")
+        # 2. Try to find by email (account exists but never logged in with Google)
+        user = session.exec(select(User).where(User.email == email)).first()
+        if user:
+            print(f"🔵 Linking Google account to existing user: {user.email}")
+            user.google_id = google_id
+            user.name = name or user.name
+            user.picture = picture or user.picture
+            user.last_login = datetime.datetime.utcnow()
+        else:
+            # 3. Brand new user
+            print(f"🔵 Creating new user: {email}")
+            user = User(
+                email=email,
+                google_id=google_id,
+                name=name,
+                picture=picture,
+                last_login=datetime.datetime.utcnow()
+            )
+            session.add(user)
+
+    session.commit()
+    session.refresh(user)
+    print(f"🔵 User ID: {user.id}")
     
     # Store Google tokens
     token_statement = select(UserToken).where(

@@ -72,7 +72,7 @@ export const CarWidget: React.FC<CarWidgetProps> = ({ apiUrl }) => {
     if (!apiUrl) return;
     
     try {
-      const response = await fetch(`${apiUrl}/api/car/cars`);
+      const response = await fetch(`${apiUrl}/api/car/cars`, { credentials: 'include' });
       const data = await response.json();
       setCars(data);
       if (data.length > 0 && !selectedCar) {
@@ -99,7 +99,7 @@ export const CarWidget: React.FC<CarWidgetProps> = ({ apiUrl }) => {
 
     setLookingUp(true);
     try {
-      const response = await fetch(`${apiUrl}/api/car/lookup/${lookupPlate}`);
+      const response = await fetch(`${apiUrl}/api/car/lookup/${lookupPlate}`, { credentials: 'include' });
       const data = await response.json();
 
       if (data.found) {

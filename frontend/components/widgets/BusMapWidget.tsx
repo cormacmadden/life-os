@@ -81,7 +81,9 @@ export const BusMapWidget = React.forwardRef<BusMapWidgetHandle, BusMapWidgetPro
     if (!apiUrl) return;
     
     try {
-      const response = await fetch(`${apiUrl}/api/user/config`);
+      const response = await fetch(`${apiUrl}/api/user/config`, {
+        credentials: 'include'
+      });
       if (response.ok) {
         const config = await response.json();
         if (config.home_latitude && config.home_longitude) {

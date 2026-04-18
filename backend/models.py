@@ -9,6 +9,7 @@ class User(SQLModel, table=True):
     google_id: Optional[str] = Field(default=None, unique=True, index=True)
     name: Optional[str] = None
     picture: Optional[str] = None
+    password_hash: Optional[str] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
     last_login: Optional[datetime] = None
     plants: List["Plant"] = Relationship(back_populates="owner")
