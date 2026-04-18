@@ -49,10 +49,13 @@ jobs:
           PORTAINER_URL: ${{ secrets.PORTAINER_URL }}
           PORTAINER_TOKEN: ${{ secrets.PORTAINER_TOKEN }}
         run: |
-          STACK_ID=$(curl -sk \
+          STACK=$(curl -sk \
             -H "X-API-Key: $PORTAINER_TOKEN" \
             "$PORTAINER_URL/api/stacks" \
-            | jq '.[] | select(.Name=="life-os") | .Id')
+            | jq '.[] | select(.Name=="life-os")')
+
+          STACK_ID=$(echo "$STACK" | jq '.Id')
+          ENDPOINT_ID=$(echo "$STACK" | jq '.EndpointId')
 
           STACK_CONTENT=$(curl -sk \
             -H "X-API-Key: $PORTAINER_TOKEN" \
@@ -62,5 +65,5 @@ jobs:
           curl -sk -X PUT \
             -H "X-API-Key: $PORTAINER_TOKEN" \
             -H "Content-Type: application/json" \
-            "$PORTAINER_URL/api/stacks/$STACK_ID?endpointId=1" \
+            "$PORTAINER_URL/api/stacks/$STACK_ID?endpointId=$ENDPOINT_ID" \
             -d "{\"pullImage\": false, \"prune\": false, \"stackFileContent\": $STACK_CONTENT}"
