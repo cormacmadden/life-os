@@ -133,7 +133,7 @@ $frontendReady = $false
 while ($attempt -lt $maxAttempts -and -not $frontendReady) {
     Start-Sleep -Seconds 1
     try {
-        $response = Invoke-WebRequest -Uri "http://localhost:3000" -TimeoutSec 2 -ErrorAction SilentlyContinue
+        $response = Invoke-WebRequest -Uri "http://localhost:3001" -TimeoutSec 2 -ErrorAction SilentlyContinue
         if ($response.StatusCode -eq 200) {
             $frontendReady = $true
         }
@@ -154,7 +154,7 @@ Write-Host "`n✅ LifeOS Started!" -ForegroundColor Green
 Write-Host "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━" -ForegroundColor Cyan
 Write-Host "LOCAL URLS:" -ForegroundColor Yellow
 Write-Host "Backend:        http://localhost:8080/docs" -ForegroundColor White
-Write-Host "Frontend:       http://localhost:3000" -ForegroundColor White
+Write-Host "Frontend:       http://localhost:3001" -ForegroundColor White
 
 # Check Home Assistant status and display URL
 $haStatus = docker ps --filter "name=home-assistant" --format "{{.Status}}" 2>$null

@@ -6,13 +6,21 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlmodel import Session, select
 from typing import Optional
 import jwt
+import os
 import secrets
+import logging
 from datetime import datetime, timedelta
 from backend.database import get_session
 from backend.models import User
 
 # JWT configuration
-SECRET_KEY = secrets.token_urlsafe(32)  # In production, load from env
+_secret_key = os.getenv("JWT_SECRET_KEY")
+if not _secret_key:
+    _secret_key = secrets.token_urlsafe(32)
+    logging.getLogger(__name__).warning(
+        "JWT_SECRET_KEY env var not set — sessions will not persist across restarts."
+    )
+SECRET_KEY = _secret_key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 

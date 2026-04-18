@@ -40,7 +40,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 # --- 6. SYNC SESSION for OAuth callbacks (non-async) ---
 from sqlmodel import Session, create_engine
-sync_engine = create_engine("sqlite:///./backend/life_os.db", echo=False, connect_args={"check_same_thread": False})
+sync_engine = create_engine("sqlite:///./lifeos_data.db", echo=False, connect_args={"check_same_thread": False})
 
 def get_sync_session():
     with Session(sync_engine) as session:

@@ -18,6 +18,7 @@ export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [balance, setBalance] = useState<string>("£0.00");
   const [financeData, setFinanceData] = useState<FinanceEntry[]>([]);
+  const [needsReauth, setNeedsReauth] = useState<boolean>(false);
 
   // Check Monzo connection status
   useEffect(() => {
@@ -48,7 +49,16 @@ export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
       const chartResponse = await fetch(`${apiUrl}/api/monzo/balance-chart`, {
         credentials: 'include'
       });
+      if (!chartResponse.ok) {
+        if (chartResponse.status === 403) {
+          setNeedsReauth(true);
+        } else {
+          console.error('Monzo balance-chart error:', chartResponse.status);
+        }
+        return;
+      }
       const chartData = await chartResponse.json();
+      if (chartData.current_balance == null) return;
       setBalance(`£${chartData.current_balance.toFixed(2)}`);
       setFinanceData(chartData.chart_data);
     } catch (err) {
@@ -93,6 +103,26 @@ export const FinanceWidget: React.FC<FinanceWidgetProps> = ({
             className={`px-4 py-2 rounded font-semibold ${THEME.mainBg} ${THEME.bg} hover:opacity-80 transition-opacity`}
           >
             connect monzo
+          </button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (needsReauth) {
+    return (
+      <Card>
+        <CardHeader title="monzo" icon={CreditCard} />
+        <CardContent className="flex flex-col items-center justify-center py-8 space-y-4">
+          <Link2 className={`w-12 h-12 ${THEME.sub}`} />
+          <p className={`${THEME.sub} text-sm text-center`}>
+            Monzo needs to be reauthorised — open your Monzo app to approve access, then reconnect.
+          </p>
+          <button
+            onClick={handleConnect}
+            className={`px-4 py-2 rounded font-semibold ${THEME.mainBg} ${THEME.bg} hover:opacity-80 transition-opacity`}
+          >
+            reconnect monzo
           </button>
         </CardContent>
       </Card>

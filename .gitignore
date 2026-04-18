@@ -1,6 +1,10 @@
 # Environment variables
 .env
 backend/.env
+backend/.env.yaml
+
+# Sensitive local files
+life-os-passwords.txt
 
 # Python
 __pycache__/

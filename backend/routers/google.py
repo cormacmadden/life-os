@@ -46,10 +46,7 @@ SCOPES = [
 async def google_login():
     """Initiate Google OAuth flow"""
     redirect_uri = get_redirect_uri()
-    print(f"🔵 REDIRECT_URI from function: {redirect_uri}")
-    print(f"🔵 ENV GOOGLE_REDIRECT_URI: {os.getenv('GOOGLE_REDIRECT_URI')}")
-    print(f"🔵 All env vars with GOOGLE: {[k for k in os.environ.keys() if 'GOOGLE' in k]}")
-    
+
     if not os.path.exists(CREDENTIALS_FILE):
         return {
             "error": "Google OAuth not configured",

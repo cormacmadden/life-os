@@ -16,7 +16,15 @@ jobs:
         run: docker build -t life-os-backend:latest .
 
       - name: Build frontend image
-        run: docker build -t life-os-frontend:latest -f frontend/Dockerfile .
+        env:
+          LOCAL_BACKEND_URL: ${{ secrets.LOCAL_BACKEND_URL }}
+          PROD_BACKEND_URL: ${{ secrets.PROD_BACKEND_URL }}
+        run: |
+          docker build \
+            --build-arg NEXT_PUBLIC_LOCAL_BACKEND_URL="$LOCAL_BACKEND_URL" \
+            --build-arg NEXT_PUBLIC_PROD_BACKEND_URL="$PROD_BACKEND_URL" \
+            -t life-os-frontend:latest \
+            -f frontend/Dockerfile .
 
       - name: Redeploy Portainer stack
         env:

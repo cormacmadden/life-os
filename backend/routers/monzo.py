@@ -2,10 +2,14 @@ from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 import httpx
 import os
+import secrets as _secrets
 from datetime import datetime, timedelta
 from typing import Optional
 
 router = APIRouter()
+
+# Pending OAuth state (single-user; stores the random state between /auth and /callback)
+_pending_oauth_state: Optional[str] = None
 
 # Monzo OAuth credentials
 MONZO_CLIENT_ID = os.getenv("MONZO_CLIENT_ID")
@@ -62,23 +66,30 @@ monzo_tokens = load_tokens()
 @router.get("/auth")
 async def monzo_auth():
     """Redirect to Monzo OAuth login"""
+    global _pending_oauth_state
     if not MONZO_CLIENT_ID:
         raise HTTPException(
             status_code=500,
             detail="Monzo API not configured. Add MONZO_CLIENT_ID to .env"
         )
-    
+
+    _pending_oauth_state = _secrets.token_urlsafe(16)
     auth_url = (
         f"https://auth.monzo.com/?client_id={MONZO_CLIENT_ID}"
         f"&redirect_uri={REDIRECT_URI}"
         f"&response_type=code"
-        f"&state=random_state_string"
+        f"&state={_pending_oauth_state}"
     )
     return RedirectResponse(auth_url)
 
 @router.get("/callback")
 async def monzo_callback(code: str, state: str):
     """Handle OAuth callback from Monzo"""
+    global _pending_oauth_state
+    if _pending_oauth_state is None or not _secrets.compare_digest(state, _pending_oauth_state):
+        raise HTTPException(status_code=400, detail="Invalid OAuth state parameter")
+    _pending_oauth_state = None  # Consume state — one-time use
+
     try:
         if not MONZO_CLIENT_ID or not MONZO_CLIENT_SECRET:
             raise HTTPException(
@@ -382,9 +393,19 @@ async def get_transactions(account_id: Optional[str] = None, days: int = 7):
                 "https://api.monzo.com/accounts",
                 headers={"Authorization": f"Bearer {token}"}
             )
+            if accounts_response.status_code == 403:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Monzo access forbidden — please reconnect your account in the app to reauthorise access."
+                )
+            if accounts_response.status_code != 200:
+                raise HTTPException(
+                    status_code=accounts_response.status_code,
+                    detail=f"Failed to get Monzo accounts: {accounts_response.text}"
+                )
             accounts = accounts_response.json().get("accounts", [])
             if not accounts:
-                raise HTTPException(status_code=404, detail="No accounts found")
+                raise HTTPException(status_code=404, detail="No Monzo accounts found")
             account_id = accounts[0]["id"]
     
     # Get transactions from the last N days
@@ -434,12 +455,22 @@ async def get_balance_chart(account_id: Optional[str] = None, days: int = 7):
                 "https://api.monzo.com/accounts",
                 headers={"Authorization": f"Bearer {token}"}
             )
+            if accounts_response.status_code == 403:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Monzo access forbidden — please reconnect your account in the app to reauthorise access."
+                )
+            if accounts_response.status_code != 200:
+                raise HTTPException(
+                    status_code=accounts_response.status_code,
+                    detail=f"Failed to get Monzo accounts: {accounts_response.text}"
+                )
             accounts = accounts_response.json().get("accounts", [])
             if not accounts:
-                raise HTTPException(status_code=404, detail="No accounts found")
+                raise HTTPException(status_code=404, detail="No Monzo accounts found")
             active_accounts = [acc for acc in accounts if not acc.get("closed", False)]
             if not active_accounts:
-                raise HTTPException(status_code=404, detail="No active accounts found")
+                raise HTTPException(status_code=404, detail="No active Monzo accounts found")
             account_id = active_accounts[0]["id"]
     
     # Get transactions from the last N days

@@ -1,11 +1,9 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
-import time
-from datetime import datetime
-import threading
-# Force rebuild with credentials.json and CORS fix v2
+import os
+from typing import Optional
 
 # NOTE: Imports must use the leading dot ('.') since uvicorn runs from the parent directory.
 from backend.database import engine
@@ -44,10 +42,10 @@ async def lifespan(app: FastAPI):
 app = FastAPI(lifespan=lifespan)
 
 # --- CONFIGURATION & CORS ---
+_extra_origins = [o.strip() for o in os.getenv("EXTRA_CORS_ORIGINS", "").split(",") if o.strip()]
 ORIGINS = [
     "http://localhost:3000",
-    "http://192.168.4.28:3000",
-    "http://192.168.1.214:3000",
+    *_extra_origins,
     "https://life-os-dashboard.com",
     "https://www.life-os-dashboard.com"
 ]
@@ -62,14 +60,6 @@ app.add_middleware(
     max_age=3600,
 )
 
-# IP Logging Middleware
-@app.middleware("http")
-async def log_active_threads(request: Request, call_next):
-    print(f"Active threads before request: {threading.active_count()}")
-    response = await call_next(request)
-    print(f"Active threads after request: {threading.active_count()}")
-    return response
-
 app.include_router(transport.router, prefix="/api")
 app.include_router(google.router, prefix="/api/google")
 app.include_router(smarthome.router, prefix="/api/smarthome")
@@ -82,21 +72,12 @@ app.include_router(weather.router, prefix="/api/weather")
 app.include_router(user.router, prefix="/api/user")
 app.include_router(workouts.router, prefix="")
 
-@app.get("/api/debug/env")
-async def debug_env():
-    """Debug endpoint to check environment variables"""
-    import os
-    google_vars = {k: v for k, v in os.environ.items() if 'GOOGLE' in k}
-    return {
-        "GOOGLE_REDIRECT_URI": os.getenv("GOOGLE_REDIRECT_URI", "NOT SET"),
-        "GOOGLE_POST_LOGIN_REDIRECT": os.getenv("GOOGLE_POST_LOGIN_REDIRECT", "NOT SET"),
-        "all_google_vars": google_vars,
-        "ORIGINS": ORIGINS
-    }
-
 @app.get("/api/init-db")
-async def init_db():
-    """Initialize database tables. Run this once after first setup."""
+async def init_db(x_init_secret: Optional[str] = Header(default=None)):
+    """Initialize database tables. Requires INIT_DB_SECRET header in production."""
+    expected = os.getenv("INIT_DB_SECRET")
+    if expected and x_init_secret != expected:
+        raise HTTPException(status_code=403, detail="Forbidden")
     try:
         async with engine.begin() as conn:
             await conn.run_sync(SQLModel.metadata.create_all)

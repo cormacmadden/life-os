@@ -195,7 +195,9 @@ export default function App() {
   // API URL - tries local first, falls back to production
   const LOCAL_API = process.env.NEXT_PUBLIC_LOCAL_BACKEND_URL || "http://localhost:8080";
   const REMOTE_API = process.env.NEXT_PUBLIC_PROD_BACKEND_URL || "http://localhost:8080";
-  const [API_BASE_URL, setApiBaseUrl] = useState<string>(LOCAL_API);
+  const isProdBuild = process.env.NODE_ENV === 'production';
+  const [API_BASE_URL, setApiBaseUrl] = useState<string>(isProdBuild ? REMOTE_API : LOCAL_API);
+  const [apiUrlReady, setApiUrlReady] = useState<boolean>(isProdBuild);
 
   // DATA STATES
   const [busData, setBusData] = useState<BusData>(MOCK_BUS_DATA);
@@ -242,6 +244,7 @@ export default function App() {
     if (isProd) {
       console.log('🌐 Production mode: Using remote API:', REMOTE_API);
       setApiBaseUrl(REMOTE_API);
+      setApiUrlReady(true);
     } else {
       console.log('🏠 Development mode: Trying local API first:', LOCAL_API);
       setApiBaseUrl(LOCAL_API);
@@ -275,6 +278,8 @@ export default function App() {
           console.log(`⚠️ Local API health check failed after ${elapsed}ms:`, errorMsg);
           console.log('🌐 Switching to remote API:', REMOTE_API);
           setApiBaseUrl(REMOTE_API);
+        } finally {
+          setApiUrlReady(true);
         }
       };
       
@@ -419,7 +424,7 @@ export default function App() {
   // Load user config on mount
   useEffect(() => {
     const loadUserConfig = async () => {
-      if (!API_BASE_URL) return;
+      if (!API_BASE_URL || !apiUrlReady) return;
       
       console.log('⏳ Loading user config from:', API_BASE_URL);
       setConfigLoading(true);
@@ -461,7 +466,7 @@ export default function App() {
     };
     
     loadUserConfig();
-  }, [API_BASE_URL]);
+  }, [API_BASE_URL, apiUrlReady]);
 
   const saveUserConfig = async () => {
     setSaveButtonState('saving');
