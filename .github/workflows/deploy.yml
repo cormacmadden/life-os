@@ -57,13 +57,14 @@ jobs:
           STACK_ID=$(echo "$STACK" | jq '.Id')
           ENDPOINT_ID=$(echo "$STACK" | jq '.EndpointId')
 
-          STACK_CONTENT=$(curl -sk \
+          STACK_FILE=$(curl -sk \
             -H "X-API-Key: $PORTAINER_TOKEN" \
-            "$PORTAINER_URL/api/stacks/$STACK_ID/file" \
-            | jq '.StackFileContent | tojson')
+            "$PORTAINER_URL/api/stacks/$STACK_ID/file")
+
+          REQUEST_BODY=$(echo "$STACK_FILE" | jq '{pullImage: false, prune: false, stackFileContent: .StackFileContent}')
 
           curl -sk -X PUT \
             -H "X-API-Key: $PORTAINER_TOKEN" \
             -H "Content-Type: application/json" \
             "$PORTAINER_URL/api/stacks/$STACK_ID?endpointId=$ENDPOINT_ID" \
-            -d "{\"pullImage\": false, \"prune\": false, \"stackFileContent\": $STACK_CONTENT}"
+            -d "$REQUEST_BODY"
