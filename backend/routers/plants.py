@@ -16,13 +16,15 @@ class PlantCreate(SQLModel):
     watering_frequency_days: int
     image_url: Optional[str] = None
 
-@router.get("/", response_model=List[Plant])
+@router.get("", response_model=List[Plant])
+@router.get("/", response_model=List[Plant], include_in_schema=False)
 async def get_plants(session: AsyncSession = Depends(get_session)):
     result = await session.exec(select(Plant).where(Plant.user_id == 1))
     plants = result.all()
     return plants
 
-@router.post("/", response_model=Plant)
+@router.post("", response_model=Plant)
+@router.post("/", response_model=Plant, include_in_schema=False)
 async def add_plant(plant_data: PlantCreate, session: AsyncSession = Depends(get_session)):
     plant = Plant(
         **plant_data.model_dump(),

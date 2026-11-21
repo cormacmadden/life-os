@@ -17,7 +17,7 @@ MONZO_CLIENT_SECRET = os.getenv("MONZO_CLIENT_SECRET")
 REDIRECT_URI = os.getenv("MONZO_REDIRECT_URI", "http://localhost:8080/api/monzo/callback")
 
 # Token storage file
-TOKEN_FILE = "monzo_tokens.json"
+TOKEN_FILE = os.getenv("MONZO_TOKEN_FILE", "monzo_tokens.json")
 
 def load_tokens():
     """Load tokens from file"""

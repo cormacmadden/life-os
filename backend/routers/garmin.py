@@ -17,7 +17,7 @@ GARMIN_EMAIL = os.getenv("GARMIN_EMAIL")
 GARMIN_PASSWORD = os.getenv("GARMIN_PASSWORD")
 
 # Token storage file
-TOKEN_DIR = os.path.join(BACKEND_DIR, ".garmin_tokens")
+TOKEN_DIR = os.getenv("GARMIN_TOKEN_DIR", os.path.join(BACKEND_DIR, ".garmin_tokens"))
 os.makedirs(TOKEN_DIR, exist_ok=True)
 
 # Simple in-memory cache

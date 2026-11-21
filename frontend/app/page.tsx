@@ -38,6 +38,7 @@ import { BusData, HomeState, Plant, CalendarEvent, Email, GoogleData, FinanceEnt
 import { Card, CardHeader, CardContent } from '@/components/Card';
 import GoogleWidget from '@/components/widgets/GoogleWidget';
 import { useAuth } from '@/context/AuthContext';
+import { apiBase } from '@/lib/api';
 
 // Loading component for lazy-loaded widgets
 const WidgetLoading = ({ title, icon: Icon }: { title: string; icon: LucideIcon }) => (
@@ -194,12 +195,9 @@ export default function App() {
     }
   }, [widgetVisibility]);
 
-  // API URL - tries local first, falls back to production
-  const LOCAL_API = process.env.NEXT_PUBLIC_LOCAL_BACKEND_URL || "http://localhost:8080";
-  const REMOTE_API = process.env.NEXT_PUBLIC_PROD_BACKEND_URL || "http://localhost:8080";
-  const isProdBuild = process.env.NODE_ENV === 'production';
-  const [API_BASE_URL, setApiBaseUrl] = useState<string>(isProdBuild ? REMOTE_API : LOCAL_API);
-  const [apiUrlReady, setApiUrlReady] = useState<boolean>(isProdBuild);
+  // API URL - same origin; Next.js proxies /api to the backend (see lib/api.ts)
+  const [API_BASE_URL, setApiBaseUrl] = useState<string>('');
+  const [apiUrlReady, setApiUrlReady] = useState<boolean>(false);
 
   // DATA STATES
   const [busData, setBusData] = useState<BusData>(MOCK_BUS_DATA);
@@ -240,53 +238,8 @@ export default function App() {
   useEffect(() => {
     setIsClient(true);
     
-    // In production build, use remote API. In dev, try local first.
-    const isProd = process.env.NODE_ENV === 'production';
-    
-    if (isProd) {
-      console.log('🌐 Production mode: Using remote API:', REMOTE_API);
-      setApiBaseUrl(REMOTE_API);
-      setApiUrlReady(true);
-    } else {
-      console.log('🏠 Development mode: Trying local API first:', LOCAL_API);
-      setApiBaseUrl(LOCAL_API);
-      
-      // Quick background check - if local fails, switch to remote
-      const verifyApiUrl = async () => {
-        const startTime = Date.now();
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
-          
-          console.log('⏱️ Starting API health check...');
-          const response = await fetch(`${LOCAL_API}/health`, {
-            method: 'GET',
-            signal: controller.signal,
-            cache: 'no-store',
-          });
-          
-          clearTimeout(timeoutId);
-          const elapsed = Date.now() - startTime;
-          
-          if (response.ok) {
-            console.log(`✅ Local API confirmed working (${elapsed}ms)`);
-          } else {
-            console.log(`⚠️ Local API returned ${response.status}, switching to remote`);
-            setApiBaseUrl(REMOTE_API);
-          }
-        } catch (error) {
-          const elapsed = Date.now() - startTime;
-          const errorMsg = error instanceof Error ? error.message : String(error);
-          console.log(`⚠️ Local API health check failed after ${elapsed}ms:`, errorMsg);
-          console.log('🌐 Switching to remote API:', REMOTE_API);
-          setApiBaseUrl(REMOTE_API);
-        } finally {
-          setApiUrlReady(true);
-        }
-      };
-      
-      verifyApiUrl();
-    }
+    setApiBaseUrl(apiBase());
+    setApiUrlReady(true);
   }, []);
 
   // Fetch integration statuses once API URL is confirmed ready

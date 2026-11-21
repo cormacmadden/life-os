@@ -1,0 +1,45 @@
+# Portainer stack "life-os". The deploy workflow PUTs this file to Portainer,
+# so edit it here, not in the Portainer UI.
+#
+# Host state (not in git):
+#   /opt/life-os/backend.env  secrets, mounted where backend/database.py loads it
+#   /opt/life-os/data/        SQLite database (survives image rebuilds)
+#
+# Public access: Cloudflare tunnel "minipc-docker" routes life-os-dashboard.com
+# to the frontend (:3000), guarded by Cloudflare Access. The frontend proxies
+# /api to the backend, so the backend has no public port.
+services:
+  backend:
+    image: life-os-backend:latest
+    container_name: life-os-backend
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      - ENVIRONMENT=production
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/lifeos_data.db
+      # OAuth tokens live on the data volume so redeploys don't log you out
+      - GARMIN_TOKEN_DIR=/app/data/garmin_tokens
+      - MONZO_TOKEN_FILE=/app/data/monzo_tokens.json
+      - GOOGLE_TOKEN_FILE=/app/data/google_token.json
+      - GOOGLE_CREDENTIALS_FILE=/app/data/credentials.json
+    volumes:
+      - /opt/life-os/backend.env:/app/backend/.env:ro
+      - /opt/life-os/data:/app/data
+    networks:
+      - life-os-network
+
+  frontend:
+    image: life-os-frontend:latest
+    container_name: life-os-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - life-os-network
+
+networks:
+  life-os-network:
+    driver: bridge
