@@ -20,6 +20,10 @@ access_logger.setLevel(logging.INFO)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("LifeOS Backend starting...")
+
+    # Create any missing tables (create_all never drops or alters existing ones)
+    async with engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
     
     # Configure logging to reduce noise from repetitive endpoints
     uvicorn_logger = logging.getLogger("uvicorn.access")

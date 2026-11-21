@@ -8,11 +8,9 @@ RUN npm ci
 
 COPY frontend ./
 
-# Allow backend URLs to be injected at build time (required for NEXT_PUBLIC_* vars)
-ARG NEXT_PUBLIC_LOCAL_BACKEND_URL
-ARG NEXT_PUBLIC_PROD_BACKEND_URL
-ENV NEXT_PUBLIC_LOCAL_BACKEND_URL=$NEXT_PUBLIC_LOCAL_BACKEND_URL
-ENV NEXT_PUBLIC_PROD_BACKEND_URL=$NEXT_PUBLIC_PROD_BACKEND_URL
+# The Next.js server proxies /api/* here (rewrites are fixed at build time).
+ARG BACKEND_INTERNAL_URL=http://backend:8080
+ENV BACKEND_INTERNAL_URL=$BACKEND_INTERNAL_URL
 
 RUN npm run build
 
