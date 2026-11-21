@@ -7,6 +7,11 @@ short-lived bearer token. No Garmin email or password is needed.
 
 The key file is mounted read-only at GARMIN_API_KEY_FILE. Response shapes match
 the old garminconnect-based router, so the frontend widget is unchanged.
+
+History (sleep, activities, weight) is read from Gymin's Postgres when
+GYMIN_DB_URL is set: Gymin already syncs Garmin every 30 min, so life-os
+doesn't fetch the same data twice. Only today's live numbers (steps,
+calories, stress, heart rate) come straight from the Personal API.
 """
 import asyncio
 import os
@@ -15,6 +20,11 @@ from datetime import date, datetime, timedelta
 
 import httpx
 from fastapi import APIRouter, HTTPException
+
+try:
+    import asyncpg
+except ImportError:  # optional; without it everything comes from the Personal API
+    asyncpg = None
 
 router = APIRouter()
 
@@ -30,6 +40,23 @@ _token_exp = 0.0
 _backoff_until = 0.0
 _cache: dict[str, tuple[float, object]] = {}
 _lock = asyncio.Lock()
+
+GYMIN_DB_URL = os.getenv("GYMIN_DB_URL")
+_pool = None
+
+
+async def _gymin_fetch(sql: str, *args):
+    """Rows from Gymin's database (read-only role), or None if it isn't configured or reachable."""
+    global _pool
+    if not (GYMIN_DB_URL and asyncpg):
+        return None
+    try:
+        if _pool is None:
+            _pool = await asyncpg.create_pool(GYMIN_DB_URL, min_size=0, max_size=2, timeout=5)
+        return await _pool.fetch(sql, *args)
+    except Exception as e:
+        print(f"Gymin DB unavailable, falling back to Garmin API: {e}")
+        return None
 
 
 class GarminError(Exception):
@@ -152,6 +179,23 @@ def _local_iso(ms):
 async def get_sleep(days: int = 7):
     """Recent nights of sleep, newest first."""
     days = max(1, min(days, 31))
+    rows = await _gymin_fetch(
+        """SELECT day, sleep_s, deep_s, light_s, rem_s, awake_s, sleep_score, sleep_start, sleep_end
+           FROM wellness_daily
+           WHERE deleted_at IS NULL AND sleep_s > 0 AND day > current_date - $1::int
+           ORDER BY day DESC""", days)
+    if rows is not None:
+        return [{
+            "date": r["day"].isoformat(),
+            "total_sleep_seconds": r["sleep_s"] or 0,
+            "deep_sleep_seconds": r["deep_s"] or 0,
+            "light_sleep_seconds": r["light_s"] or 0,
+            "rem_sleep_seconds": r["rem_s"] or 0,
+            "awake_seconds": r["awake_s"] or 0,
+            "sleep_score": r["sleep_score"],
+            "sleep_start": r["sleep_start"].isoformat() if r["sleep_start"] else None,
+            "sleep_end": r["sleep_end"].isoformat() if r["sleep_end"] else None,
+        } for r in rows]
     end = date.today()
     start = end - timedelta(days=days - 1)
     try:
@@ -181,6 +225,21 @@ async def get_sleep(days: int = 7):
 async def get_recent_activities(limit: int = 5):
     """Most recent activities."""
     limit = max(1, min(limit, 50))
+    rows = await _gymin_fetch(
+        """SELECT source_id, title, sport, source_type, started_at, minutes, km, calories, avg_hr, max_hr
+           FROM v_activities ORDER BY started_at DESC LIMIT $1""", limit)
+    if rows is not None:
+        return [{
+            "id": r["source_id"],
+            "name": r["title"],
+            "type": r["source_type"] or r["sport"],
+            "start_time": r["started_at"].astimezone().strftime("%Y-%m-%d %H:%M:%S") if r["started_at"] else None,
+            "duration_seconds": float(r["minutes"]) * 60 if r["minutes"] is not None else None,
+            "distance_km": float(r["km"]) if r["km"] else None,
+            "calories": r["calories"],
+            "avg_hr": r["avg_hr"],
+            "max_hr": r["max_hr"],
+        } for r in rows]
     try:
         acts = await garmin_get("/activitylist-service/activities/search/activities", {"start": 0, "limit": limit})
     except GarminError as e:
@@ -219,14 +278,18 @@ async def get_heart_rate():
 
 @router.get("/body")
 async def get_body_metrics():
-    """Latest weight (last 30 days) and today's stress."""
+    """Latest weight (from Gymin, else Garmin's last 30 days) and today's stress."""
     today = date.today()
     weight_kg = avg_stress = max_stress = None
+    rows = await _gymin_fetch(
+        "SELECT weight_kg FROM v_measurements WHERE weight_kg IS NOT NULL ORDER BY day DESC LIMIT 1")
+    if rows:
+        weight_kg = round(float(rows[0]["weight_kg"]), 1)
     try:
-        w = await garmin_get(f"/weight-service/weight/range/{(today - timedelta(days=30)).isoformat()}/{today.isoformat()}", {"includeAll": "true"}) or {}
+        w = {} if rows is not None else await garmin_get(f"/weight-service/weight/range/{(today - timedelta(days=30)).isoformat()}/{today.isoformat()}", {"includeAll": "true"}) or {}
         for day in w.get("dailyWeightSummaries") or []:  # newest first
             grams = (day.get("latestWeight") or {}).get("weight")
-            if grams:
+            if grams and weight_kg is None:
                 weight_kg = round(grams / 1000, 1)
                 break
         stress = (await _daily_summary(today.isoformat())).get("stress") or {}

@@ -29,6 +29,8 @@ services:
       - /home/claude/.config/garmin-mcp/api-key:/run/garmin/api-key:ro
     networks:
       - life-os-network
+      # Read-only access to Gymin's Postgres (gymin-db) for Garmin history; GYMIN_DB_URL is in backend.env
+      - gymin
 
   frontend:
     image: life-os-frontend:latest
@@ -44,3 +46,6 @@ services:
 networks:
   life-os-network:
     driver: bridge
+  gymin:
+    external: true
+    name: gymin_default
