@@ -19,13 +19,14 @@ services:
       - ENVIRONMENT=production
       - DATABASE_URL=sqlite+aiosqlite:////app/data/lifeos_data.db
       # OAuth tokens live on the data volume so redeploys don't log you out
-      - GARMIN_TOKEN_DIR=/app/data/garmin_tokens
       - MONZO_TOKEN_FILE=/app/data/monzo_tokens.json
       - GOOGLE_TOKEN_FILE=/app/data/google_token.json
       - GOOGLE_CREDENTIALS_FILE=/app/data/credentials.json
     volumes:
       - /opt/life-os/backend.env:/app/backend/.env:ro
       - /opt/life-os/data:/app/data
+      # Garmin personal API key, shared with Gymin and the garmin MCP
+      - /home/claude/.config/garmin-mcp/api-key:/run/garmin/api-key:ro
     networks:
       - life-os-network
 
