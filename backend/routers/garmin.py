@@ -1,284 +1,251 @@
-from fastapi import APIRouter, HTTPException
-from garminconnect import Garmin
+"""
+Garmin data via Garmin's official Personal API (personal.connectapi.garmin.com).
+
+Auth is a personal API key (made at connect.garmin.com → Settings → Personal
+API token), the same key Gymin and the garmin MCP use. It is exchanged for a
+short-lived bearer token. No Garmin email or password is needed.
+
+The key file is mounted read-only at GARMIN_API_KEY_FILE. Response shapes match
+the old garminconnect-based router, so the frontend widget is unchanged.
+"""
+import asyncio
 import os
-from dotenv import load_dotenv
-from datetime import datetime, date, timedelta
-import json
+import time
+from datetime import date, datetime, timedelta
+
+import httpx
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
-# Load environment variables
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-BACKEND_DIR = os.path.dirname(CURRENT_DIR)
-ENV_PATH = os.path.join(BACKEND_DIR, '.env')
-load_dotenv(ENV_PATH)
+BASE = os.getenv("GARMIN_BASE_URL", "https://personal.connectapi.garmin.com")
+KEY_FILE = os.getenv("GARMIN_API_KEY_FILE", "/run/garmin/api-key")
+TOKEN_PATH = "/personalapitoken-service/personal-api/personal-api-key/token"
 
-GARMIN_EMAIL = os.getenv("GARMIN_EMAIL")
-GARMIN_PASSWORD = os.getenv("GARMIN_PASSWORD")
+CACHE_SECONDS = 10 * 60
+BACKOFF_SECONDS = 60 * 60  # Garmin rate-limits bursts; stop calling for an hour on 429
 
-# Token storage file
-TOKEN_DIR = os.getenv("GARMIN_TOKEN_DIR", os.path.join(BACKEND_DIR, ".garmin_tokens"))
-os.makedirs(TOKEN_DIR, exist_ok=True)
+_token: str | None = None
+_token_exp = 0.0
+_backoff_until = 0.0
+_cache: dict[str, tuple[float, object]] = {}
+_lock = asyncio.Lock()
 
-# Simple in-memory cache
-_cache = {}
-CACHE_DURATION = timedelta(minutes=10)  # Cache for 10 minutes
 
-def get_cached(key):
-    """Get cached data if it exists and is not expired."""
-    if key in _cache:
-        data, timestamp = _cache[key]
-        if datetime.now() - timestamp < CACHE_DURATION:
-            return data
-    return None
+class GarminError(Exception):
+    def __init__(self, status: int, message: str):
+        super().__init__(message)
+        self.status = status
 
-def set_cache(key, data):
-    """Set cached data with current timestamp."""
-    _cache[key] = (data, datetime.now())
 
-def get_garmin_client():
-    """Get authenticated Garmin client."""
-    client = Garmin()
-    
-    # Try to load saved session first
+def _read_key() -> str:
     try:
-        client.garth.load(TOKEN_DIR)
-        return client
-    except Exception as e:
-        print(f"Failed to load saved session: {e}")
-    
-    # If loading session fails, try to login with credentials
-    try:
-        client = Garmin(GARMIN_EMAIL, GARMIN_PASSWORD)
-        client.login()
-        
-        # Save session for future use
-        client.garth.dump(TOKEN_DIR)
-        
-        return client
-    except Exception as e:
-        print(f"Failed to login with credentials: {e}")
-        raise HTTPException(status_code=401, detail=f"Failed to authenticate with Garmin. Please check your credentials and try again: {str(e)}")
+        with open(KEY_FILE) as f:
+            key = f.read().strip()
+    except FileNotFoundError:
+        raise GarminError(503, f"Garmin API key file not found at {KEY_FILE}")
+    if not key:
+        raise GarminError(503, "Garmin API key file is empty")
+    return key
+
+
+async def _get_token(client: httpx.AsyncClient) -> str:
+    global _token, _token_exp
+    if _token and time.time() < _token_exp:
+        return _token
+    r = await client.post(BASE + TOKEN_PATH, headers={"Authorization": f"ApiKey {_read_key()}", "Accept": "*/*"})
+    if r.status_code in (401, 403):
+        raise GarminError(503, "Garmin refused the personal API key (expired or revoked). Make a new key and run ~/bin/garmin-mcp setup --force.")
+    if r.status_code == 429:
+        _start_backoff()
+    if not r.is_success:
+        raise GarminError(502, f"Garmin token service answered HTTP {r.status_code}")
+    text = r.text.strip()
+    if text.startswith("{"):
+        j = r.json()
+        _token = j.get("access_token") or j.get("accessToken") or j.get("token")
+        exp = int(j.get("expires_in") or j.get("expiresIn") or 0)
+        _token_exp = time.time() + (exp - 60 if exp > 120 else 23 * 3600)
+    else:
+        _token = text.strip('"')
+        _token_exp = time.time() + 23 * 3600
+    if not _token:
+        raise GarminError(502, "Garmin token response had no token")
+    return _token
+
+
+def _start_backoff():
+    global _backoff_until
+    _backoff_until = time.time() + BACKOFF_SECONDS
+    raise GarminError(429, "Garmin asked us to slow down (HTTP 429); pausing Garmin calls for an hour.")
+
+
+async def garmin_get(path: str, params: dict | None = None):
+    """GET a Personal API path, with token refresh, caching and 429 backoff."""
+    global _token
+    key = path + "?" + "&".join(f"{k}={v}" for k, v in sorted((params or {}).items()))
+    hit = _cache.get(key)
+    if hit and time.time() - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    if time.time() < _backoff_until:
+        raise GarminError(429, "Garmin calls are paused after a rate-limit response; try again later.")
+
+    async with _lock:  # one request at a time keeps us well under Garmin's burst limit
+        async with httpx.AsyncClient(timeout=60) as client:
+            for attempt in range(2):
+                token = await _get_token(client)
+                r = await client.get(BASE + path, params=params, headers={"Authorization": f"Bearer {token}", "Accept": "application/json"})
+                if r.status_code == 401 and attempt == 0:
+                    _token = None
+                    continue
+                if r.status_code == 429:
+                    _start_backoff()
+                if r.status_code == 204:
+                    data = None
+                elif not r.is_success:
+                    raise GarminError(502, f"Garmin GET {path} -> HTTP {r.status_code}")
+                else:
+                    data = r.json()
+                _cache[key] = (time.time(), data)
+                return data
+
+
+def _http_error(e: GarminError) -> HTTPException:
+    return HTTPException(status_code=e.status, detail=str(e))
+
+
+async def _daily_summary(day: str) -> dict:
+    d = await garmin_get("/usersummary-service/v2/dailysummaries", {"startDate": day, "endDate": day})
+    rows = (d or {}).get("data") or []
+    return rows[0] if rows else {}
+
 
 @router.get("/stats")
 async def get_stats():
-    """Get today's activity stats."""
-    cache_key = f"stats_{date.today().isoformat()}"
-    
-    # Check cache first
-    cached_data = get_cached(cache_key)
-    if cached_data:
-        return cached_data
-    
+    """Today's activity stats."""
     try:
-        client = get_garmin_client()
-        
-        # Get today's stats
-        stats = client.get_stats(date.today().isoformat())
-        
-        print(f"Garmin stats response: {stats}")
-        
-        # Helper to safely convert None to 0
-        def safe_value(val, default=0):
-            return val if val is not None else default
-        
-        total_distance = stats.get("totalDistanceMeters")
-        distance_km = round(total_distance / 1000, 2) if total_distance is not None else 0
-        
-        moderate_mins = safe_value(stats.get("moderateIntensityMinutes"))
-        vigorous_mins = safe_value(stats.get("vigorousIntensityMinutes"))
-        
-        result = {
-            "steps": safe_value(stats.get("totalSteps")),
-            "calories": safe_value(stats.get("totalKilocalories")),
-            "distance_km": distance_km,
-            "active_minutes": moderate_mins + vigorous_mins,
-            "floors": safe_value(stats.get("floorsAscended")),
-            "resting_hr": stats.get("restingHeartRate"),
-            "max_hr": stats.get("maxHeartRate"),
-            "min_hr": stats.get("minHeartRate")
-        }
-        
-        # Cache the result
-        set_cache(cache_key, result)
-        return result
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"Error fetching Garmin stats: {e}")
-        import traceback
-        traceback.print_exc()
-        error_msg = str(e)
-        if "401" in error_msg or "Unauthorized" in error_msg:
-            raise HTTPException(status_code=503, detail="Garmin authentication expired. Please re-authenticate by running: python backend/authenticate_garmin.py")
-        raise HTTPException(status_code=500, detail=f"Garmin API error: {error_msg}")
+        s = await _daily_summary(date.today().isoformat())
+    except GarminError as e:
+        raise _http_error(e)
+    move = s.get("movement") or {}
+    steps = move.get("steps") or {}
+    intensity = s.get("intensityMinutes") or {}
+    hr = s.get("heartRate") or {}
+    dist = steps.get("distanceInMeters")
+    return {
+        "steps": steps.get("value") or 0,
+        "calories": (s.get("calories") or {}).get("burnedTotal") or 0,
+        "distance_km": round(dist / 1000, 2) if dist else 0,
+        "active_minutes": (intensity.get("moderate") or 0) + (intensity.get("vigorous") or 0),
+        "floors": (move.get("floorsAscended") or {}).get("value") or 0,
+        "resting_hr": hr.get("restingValue"),
+        "max_hr": hr.get("maxValue"),
+        "min_hr": hr.get("minValue"),
+    }
+
+
+def _local_iso(ms):
+    return datetime.fromtimestamp(ms / 1000).isoformat() if ms else None
+
 
 @router.get("/sleep")
 async def get_sleep(days: int = 7):
-    """Get recent sleep data."""
-    cache_key = f"sleep_{days}_{date.today().isoformat()}"
-    
-    # Check cache first
-    cached_data = get_cached(cache_key)
-    if cached_data:
-        return cached_data
-    
+    """Recent nights of sleep, newest first."""
+    days = max(1, min(days, 31))
+    end = date.today()
+    start = end - timedelta(days=days - 1)
     try:
-        client = get_garmin_client()
-        
-        sleep_history = []
-        for i in range(days):
-            check_date = date.today() - timedelta(days=i)
-            try:
-                sleep_data = client.get_sleep_data(check_date.isoformat())
-                daily_sleep = sleep_data.get("dailySleepDTO", {})
-                
-                if daily_sleep.get("sleepTimeSeconds", 0) > 0:
-                    sleep_history.append({
-                        "date": check_date.isoformat(),
-                        "total_sleep_seconds": daily_sleep.get("sleepTimeSeconds", 0),
-                        "deep_sleep_seconds": daily_sleep.get("deepSleepSeconds", 0),
-                        "light_sleep_seconds": daily_sleep.get("lightSleepSeconds", 0),
-                        "rem_sleep_seconds": daily_sleep.get("remSleepSeconds", 0),
-                        "awake_seconds": daily_sleep.get("awakeSleepSeconds", 0),
-                        "sleep_score": daily_sleep.get("sleepScores", {}).get("overall", {}).get("value"),
-                        "sleep_start": daily_sleep.get("sleepStartTimestampLocal"),
-                        "sleep_end": daily_sleep.get("sleepEndTimestampLocal")
-                    })
-            except:
-                continue
-        
-        # Cache the result
-        set_cache(cache_key, sleep_history)
-        return sleep_history
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        nights = await garmin_get("/sleep-service/sleep/dailySleepSummariesByDate", {"startDate": start.isoformat(), "endDate": end.isoformat()})
+    except GarminError as e:
+        raise _http_error(e)
+    out = []
+    for n in nights if isinstance(nights, list) else []:
+        if not n or not n.get("sleepTimeSeconds"):
+            continue
+        out.append({
+            "date": n.get("calendarDate"),
+            "total_sleep_seconds": n.get("sleepTimeSeconds", 0),
+            "deep_sleep_seconds": n.get("deepSleepSeconds", 0),
+            "light_sleep_seconds": n.get("lightSleepSeconds", 0),
+            "rem_sleep_seconds": n.get("remSleepSeconds", 0),
+            "awake_seconds": n.get("awakeSleepSeconds", 0),
+            "sleep_score": ((n.get("sleepScores") or {}).get("overall") or {}).get("value"),
+            "sleep_start": n.get("sleepStartTimestampLocal") or _local_iso(n.get("sleepStartTimestampGMT")),
+            "sleep_end": n.get("sleepEndTimestampLocal") or _local_iso(n.get("sleepEndTimestampGMT")),
+        })
+    out.sort(key=lambda r: r["date"] or "", reverse=True)
+    return out
+
 
 @router.get("/activities")
 async def get_recent_activities(limit: int = 5):
-    """Get recent activities."""
-    cache_key = f"activities_{limit}_{date.today().isoformat()}"
-    
-    # Check cache first
-    cached_data = get_cached(cache_key)
-    if cached_data:
-        return cached_data
-    
+    """Most recent activities."""
+    limit = max(1, min(limit, 50))
     try:
-        client = get_garmin_client()
-        
-        activities = client.get_activities(0, limit)
-        
-        result = []
-        for activity in activities:
-            result.append({
-                "id": activity.get("activityId"),
-                "name": activity.get("activityName"),
-                "type": activity.get("activityType", {}).get("typeKey"),
-                "start_time": activity.get("startTimeLocal"),
-                "duration_seconds": activity.get("duration"),
-                "distance_km": round(activity.get("distance", 0) / 1000, 2) if activity.get("distance") else None,
-                "calories": activity.get("calories"),
-                "avg_hr": activity.get("averageHR"),
-                "max_hr": activity.get("maxHR")
-            })
-        
-        # Cache the result
-        set_cache(cache_key, result)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        acts = await garmin_get("/activitylist-service/activities/search/activities", {"start": 0, "limit": limit})
+    except GarminError as e:
+        raise _http_error(e)
+    return [
+        {
+            "id": a.get("activityId"),
+            "name": a.get("activityName"),
+            "type": (a.get("activityType") or {}).get("typeKey"),
+            "start_time": a.get("startTimeLocal"),
+            "duration_seconds": a.get("duration"),
+            "distance_km": round(a["distance"] / 1000, 2) if a.get("distance") else None,
+            "calories": a.get("calories"),
+            "avg_hr": a.get("averageHR"),
+            "max_hr": a.get("maxHR"),
+        }
+        for a in (acts if isinstance(acts, list) else [])
+    ]
+
 
 @router.get("/heart-rate")
 async def get_heart_rate():
-    """Get current heart rate data."""
+    """Latest heart-rate reading today plus daily min/max/resting."""
     try:
-        client = get_garmin_client()
-        
-        hr_data = client.get_heart_rates(date.today().isoformat())
-        
-        # Get latest heart rate reading
-        heart_rate_values = hr_data.get("heartRateValues", [])
-        latest_hr = None
-        if heart_rate_values:
-            # Filter out None values and get the last one
-            valid_hrs = [hr for hr in heart_rate_values if hr is not None]
-            if valid_hrs:
-                latest_hr = valid_hrs[-1]
-        
-        resting_hr = hr_data.get("restingHeartRate")
-        
-        return {
-            "current": latest_hr,
-            "resting": resting_hr,
-            "max_today": hr_data.get("maxHeartRate"),
-            "min_today": hr_data.get("minHeartRate")
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        hr = await garmin_get("/wellness-service/wellness/dailyHeartRate", {"date": date.today().isoformat()}) or {}
+    except GarminError as e:
+        raise _http_error(e)
+    values = [v[1] for v in (hr.get("heartRateValues") or []) if isinstance(v, list) and len(v) > 1 and v[1] is not None]
+    return {
+        "current": values[-1] if values else None,
+        "resting": hr.get("restingHeartRate"),
+        "max_today": hr.get("maxHeartRate"),
+        "min_today": hr.get("minHeartRate"),
+    }
+
 
 @router.get("/body")
 async def get_body_metrics():
-    """Get body metrics (weight, body battery, stress)."""
-    cache_key = f"body_{date.today().isoformat()}"
-    
-    # Check cache first
-    cached_data = get_cached(cache_key)
-    if cached_data:
-        return cached_data
-    
+    """Latest weight (last 30 days) and today's stress."""
+    today = date.today()
+    weight_kg = avg_stress = max_stress = None
     try:
-        client = get_garmin_client()
-        
-        # Get body composition
-        try:
-            body_comp = client.get_body_composition(date.today().isoformat())
-            weight = body_comp.get("weight")
-        except:
-            weight = None
-        
-        # Get stress data
-        try:
-            stress_data = client.get_stress_data(date.today().isoformat())
-            avg_stress = stress_data.get("avgStressLevel")
-            max_stress = stress_data.get("maxStressLevel")
-        except:
-            avg_stress = None
-            max_stress = None
-        
-        result = {
-            "weight_kg": weight / 1000 if weight else None,  # Convert grams to kg
-            "avg_stress": avg_stress,
-            "max_stress": max_stress
-        }
-        
-        # Cache the result
-        set_cache(cache_key, result)
-        return result
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        w = await garmin_get(f"/weight-service/weight/range/{(today - timedelta(days=30)).isoformat()}/{today.isoformat()}", {"includeAll": "true"}) or {}
+        for day in w.get("dailyWeightSummaries") or []:  # newest first
+            grams = (day.get("latestWeight") or {}).get("weight")
+            if grams:
+                weight_kg = round(grams / 1000, 1)
+                break
+        stress = (await _daily_summary(today.isoformat())).get("stress") or {}
+        avg_stress, max_stress = stress.get("avgLevel"), stress.get("maxLevel")
+    except GarminError as e:
+        raise _http_error(e)
+    return {"weight_kg": weight_kg, "avg_stress": avg_stress, "max_stress": max_stress}
+
 
 @router.get("/status")
 async def get_status():
-    """Check if Garmin authentication is working."""
+    """Whether the personal API key works."""
     try:
-        # Try to load saved session
-        client = Garmin()
-        client.garth.load(TOKEN_DIR)
-        
-        # Try a simple API call to verify
-        from datetime import date
-        stats = client.get_stats(date.today().isoformat())
-        
-        return {
-            "authenticated": True,
-            "message": "Garmin is connected",
-            "has_data": stats is not None
-        }
-    except Exception as e:
+        s = await _daily_summary(date.today().isoformat())
+        return {"authenticated": True, "message": "Garmin is connected (Personal API)", "has_data": bool(s)}
+    except GarminError as e:
         return {
             "authenticated": False,
-            "message": "Garmin authentication required",
+            "message": "Garmin Personal API not available",
             "error": str(e),
-            "instructions": "Run: python backend/authenticate_garmin.py"
+            "instructions": "Make a key at connect.garmin.com/app/settings/personalApiToken, then run ~/bin/garmin-mcp setup --force on the mini PC.",
         }

@@ -267,6 +267,6 @@ MIT License - feel free to use this for your own personal dashboard!
 ## Acknowledgments
 
 - Built with FastAPI and Next.js
-- Uses unofficial Garmin Connect API via [garminconnect](https://github.com/cyberjunky/python-garminconnect)
+- Uses Garmin's official Personal API with a personal API key (mounted at `/run/garmin/api-key`)
 - Spotify Web API
 - TransportAPI for UK bus data
